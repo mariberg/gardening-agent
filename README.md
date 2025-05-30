@@ -14,9 +14,10 @@ The prompt and details of available tools are sent to the AI model and the data 
 ![cloudwatch_logs](./images/cloudwatch_logs.jpg)
 
 Finally, the AI model will create a natural language response which the agent can return to the client:
-```
-Both plants are currently within their ideal temperature and humidity ranges. However, the forecast shows temperatures rising above the ideal range for both plants. Consider providing some shade or shelter to protect them from excessive heat.
-```
+``
+Both plants are currently within their ideal temperature and humidity ranges. However, the forecast shows temperatures 
+rising above the ideal range for both plants. Consider providing some shade or shelter to protect them from excessive heat.
+``
 
 ## Deploy Agent as a Lambda Function
 
@@ -55,9 +56,9 @@ This project requires **two DynamoDB tables**:
     "plant#grapevine"
   ]
 }
+```
 
-
-### 1. `garden_plants`
+### 2. `garden_plants`
 
 - **Primary Key**: `plant_id` (String)
 
