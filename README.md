@@ -6,12 +6,12 @@ can utilize to fetch weather data. In addition there are two custom tools that e
 user data, which contains a list of garden plants the user has. The agent is also able to fetch plant-specific details from a second DynamoDB table. Based on this data, the
 AI model is able to create tailored weather-related advice for a user's specific plants.
 
-[diagram](./images/gardening-agent.png)
+![diagram](./images/gardening-agent.png)
 
 The Lambda function is triggered by an event that contains the user ID. The weather system prompt explains the detailed use case of acting as a gardening weather advisor.
 The prompt and details of available tools are sent to the AI model and the data is retrieved and combined based on the AI model's plan:
 
-[cloudwatch_logs](./images/cloudwatch_logs.jpg)
+![cloudwatch_logs](./images/cloudwatch_logs.jpg)
 
 Finally, the AI model will create a natural language response which the agent can return to the client:
 ```
