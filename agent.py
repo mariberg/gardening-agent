@@ -1,4 +1,5 @@
 import boto3
+import json
 from strands import Agent, tool
 from strands_tools import http_request
 from typing import Dict, Any
@@ -129,20 +130,52 @@ WEATHER_SYSTEM_PROMPT = """You are a highly knowledgeable **Gardening Weather Ad
         * Refer to `protection_methods` if a risk is identified.
     * If a plant's conditions are *perfectly* within its ideal ranges for all factors and no risks are present, you can simply state, "Conditions are currently ideal for your [Plant Common Name]." but avoid listing every single perfect metric.
 
-**When displaying responses:**
--   Start with a brief summary of the current weather at the location.
--   Then, for each plant, provide clear, concise, actionable advice. **Focus on conditions that require action or highlight potential issues.**
--   Address potential risks and suggest protective measures.
+**Response Format Requirements:**
+You MUST format your response as a JSON object with the following structure:
+```json
+{
+    "summary": "A brief summary of the current weather and overall advice (1-3 sentences)",
+    "details": {
+        "weather": "Current weather conditions at the location",
+        "plants": [
+            {
+                "name": "Common name of plant 1",
+                "advice": "Detailed advice for plant 1"
+            },
+            {
+                "name": "Common name of plant 2",
+                "advice": "Detailed advice for plant 2"
+            }
+        ],
+        "risks": "Any potential risks that apply to multiple plants",
+        "general_recommendations": "Any general recommendations that apply to all plants"
+    }
+}
+```
+
+**When creating your response:**
+-   In the "summary" field, provide a brief overview of the current weather and the most important advice.
+-   In the "details" field:
+    -   Include current weather conditions in the "weather" section.
+    -   For each plant, provide clear, concise, actionable advice in the "plants" array. **Focus on conditions that require action or highlight potential issues.**
+    -   Address potential risks and suggest protective measures in the "risks" section.
+    -   Include any general recommendations that apply to all plants in the "general_recommendations" section.
 -   Handle all errors gracefully, explaining to the user what went wrong (e.g., "User not found," "Plant data missing," "Weather API error").
 -   Maintain a helpful and knowledgeable tone.
+-   IMPORTANT: Your entire response MUST be a valid JSON object that can be parsed.
 """
 
 
-def lambda_handler(event: Dict[str, Any], _context) -> str:
+def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
     user_prompt = event.get('prompt')
 
     if not user_prompt:
-        return "Error: No user prompt provided in the event. Please provide a user ID or coordinates and optional plant IDs."
+        return {
+            "summary": "Error: No user prompt provided",
+            "details": {
+                "error": "No user prompt provided in the event. Please provide a user ID or coordinates and optional plant IDs."
+            }
+        }
 
     # Initialize the agent with all necessary tools
     plant_weather_agent = Agent(
@@ -152,8 +185,47 @@ def lambda_handler(event: Dict[str, Any], _context) -> str:
     )
 
     try:
+        # Get response from the agent
         response = plant_weather_agent(user_prompt)
-        return str(response)
+        
+        # The agent returns a string, so we need to check if it's already in JSON format
+        # If it's not in JSON format or if there's an error parsing it, we'll format it ourselves
+        try:
+            # Try to parse the response as JSON
+            if isinstance(response, str):
+                parsed_response = json.loads(response)
+                
+                # Verify that the parsed response has the required fields
+                if "summary" in parsed_response and "details" in parsed_response:
+                    return parsed_response
+                else:
+                    # If the response doesn't have the required fields, format it ourselves
+                    return {
+                        "summary": "Response format error",
+                        "details": {
+                            "error": "The model response did not contain the required fields",
+                            "original_response": response
+                        }
+                    }
+            else:
+                # If the response is not a string, return it directly
+                # This handles the case where the Agent class might return a dictionary
+                return response
+                
+        except json.JSONDecodeError:
+            # If the response is not valid JSON, format it ourselves
+            return {
+                "summary": "The model provided advice but not in the required JSON format",
+                "details": {
+                    "raw_response": str(response)
+                }
+            }
+            
     except Exception as e:
         print(f"Agent processing error: {e}")
-        return f"An internal error occurred while processing your request: {str(e)}"
+        return {
+            "summary": "An internal error occurred",
+            "details": {
+                "error": f"An internal error occurred while processing your request: {str(e)}"
+            }
+        }
