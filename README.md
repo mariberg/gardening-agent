@@ -19,6 +19,29 @@ Both plants are currently within their ideal temperature and humidity ranges. Ho
 rising above the ideal range for both plants. Consider providing some shade or shelter to protect them from excessive heat.
 ``
 
+## Infrastructure as Code
+
+The project includes an infrastructure as code setup using AWS CloudFormation. The folder structure is organized as follows:
+
+```
+infrastructure/
+├── templates/           # CloudFormation templates
+│   ├── main.yaml        # Main template that orchestrates the deployment
+│   ├── database.yaml    # Template for DynamoDB tables
+│   ├── compute.yaml     # Template for Lambda functions
+│   └── permissions.yaml # Template for IAM roles and policies
+├── parameters/          # Parameter files for different environments
+│   ├── dev.json
+│   ├── test.json
+│   └── prod.json
+└── scripts/             # Helper scripts for deployment
+    ├── deploy.sh
+    ├── validate.sh
+    └── cleanup.sh
+```
+
+To deploy the infrastructure, use the deployment scripts in the `infrastructure/scripts` directory.
+
 ## Deploy Agent as a Lambda Function
 
 The Lambda function requires the following permissions:

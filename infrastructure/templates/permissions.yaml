@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for IAM roles and policies used by the Gardening Agent
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: Environment name
+
+Resources:
+  # IAM roles and policies will be defined here
+  
+Outputs:
+  # Outputs will be defined here
