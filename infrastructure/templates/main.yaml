@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Main CloudFormation template for the Gardening Agent application
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: Environment name
+
+Resources:
+  # Reference to nested stacks will be added here
+  
+Outputs:
+  # Outputs will be defined here

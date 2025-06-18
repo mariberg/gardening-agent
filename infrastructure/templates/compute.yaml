@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for Lambda functions used by the Gardening Agent
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: Environment name
+
+Resources:
+  # Lambda functions will be defined here
+  
+Outputs:
+  # Outputs will be defined here
