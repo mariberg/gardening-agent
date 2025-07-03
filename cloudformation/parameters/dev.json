@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "UserDataTableName",
+    "ParameterValue": "plant_database_users"
+  },
+  {
+    "ParameterKey": "PlantDefinitionsTableName",
+    "ParameterValue": "garden_plants"
+  },
+  {
+    "ParameterKey": "LambdaFunctionName",
+    "ParameterValue": "gardening-agent"
+  },
+  {
+    "ParameterKey": "BedrockRegion",
+    "ParameterValue": "eu-west-2"
+  }
+]

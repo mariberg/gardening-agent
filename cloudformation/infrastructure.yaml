@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Infrastructure for Gardening Weather Advisor Agent'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment name for resource naming
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+  UserDataTableName:
+    Type: String
+    Default: plant_database_users
+    Description: Name for the user data DynamoDB table
+
+  PlantDefinitionsTableName:
+    Type: String
+    Default: garden_plants
+    Description: Name for the plant definitions DynamoDB table
+
+  LambdaFunctionName:
+    Type: String
+    Default: gardening-agent
+    Description: Name for the Lambda function
+
+  BedrockRegion:
+    Type: String
+    Default: eu-west-2
+    Description: AWS region for Bedrock model access
+
+Resources:
+  # IAM Role for Lambda Function
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${LambdaFunctionName}-${Environment}-execution-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt UserDataTable.Arn
+                  - !GetAtt PlantDefinitionsTable.Arn
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: !Sub 'arn:aws:bedrock:${BedrockRegion}:*:foundation-model/amazon.nova-lite-v1:0'
+
+  # User Data DynamoDB Table
+  UserDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${UserDataTableName}-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # Plant Definitions DynamoDB Table
+  PlantDefinitionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${PlantDefinitionsTableName}-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: plant_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: plant_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # Lambda Function
+  GardeningAgentFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${LambdaFunctionName}-${Environment}'
+      Runtime: python3.11
+      Handler: src.agent.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          # Placeholder code - actual deployment will use packaged source
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "Function created successfully"}
+      Environment:
+        Variables:
+          USER_DATA_TABLE_NAME: !Ref UserDataTable
+          PLANT_DEFINITIONS_TABLE_NAME: !Ref PlantDefinitionsTable
+          BEDROCK_REGION: !Ref BedrockRegion
+      Timeout: 300
+      MemorySize: 512
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt GardeningAgentFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunctionArn'
+
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref GardeningAgentFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunctionName'
+
+  UserDataTableName:
+    Description: Name of the user data DynamoDB table
+    Value: !Ref UserDataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-UserDataTableName'
+
+  UserDataTableArn:
+    Description: ARN of the user data DynamoDB table
+    Value: !GetAtt UserDataTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-UserDataTableArn'
+
+  PlantDefinitionsTableName:
+    Description: Name of the plant definitions DynamoDB table
+    Value: !Ref PlantDefinitionsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-PlantDefinitionsTableName'
+
+  PlantDefinitionsTableArn:
+    Description: ARN of the plant definitions DynamoDB table
+    Value: !GetAtt PlantDefinitionsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-PlantDefinitionsTableArn'
+
+  IAMRoleArn:
+    Description: ARN of the Lambda execution role
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-IAMRoleArn'

@@ -1,14 +1,19 @@
 import boto3
+import os
 from strands import Agent, tool
 from strands_tools import http_request
 from typing import Dict, Any
 
-dynamodb = boto3.resource('dynamodb', region_name='eu-west-2') 
+# Get configuration from environment variables (set by CloudFormation)
+BEDROCK_REGION = os.environ.get('BEDROCK_REGION', 'eu-west-2')
+USER_DATA_TABLE_NAME = os.environ.get('USER_DATA_TABLE_NAME', 'plant_database_users')
+PLANT_DEFINITIONS_TABLE_NAME = os.environ.get('PLANT_DEFINITIONS_TABLE_NAME', 'garden_plants')
 
-USER_DATA_TABLE_NAME = 'plant_database_users' # This table holds user_id, lat, lon, plants list
+# Initialize DynamoDB resource with region from environment
+dynamodb = boto3.resource('dynamodb', region_name=BEDROCK_REGION)
+
+# Initialize table references
 user_data_table = dynamodb.Table(USER_DATA_TABLE_NAME)
-
-PLANT_DEFINITIONS_TABLE_NAME = 'garden_plants' # This table holds detailed plant characteristics (ideal temp range, wind tolerance, etc.)
 plant_definitions_table = dynamodb.Table(PLANT_DEFINITIONS_TABLE_NAME)
 
 @tool
@@ -165,6 +170,7 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
         system_prompt=WEATHER_SYSTEM_PROMPT,
         tools=[http_request, dynamodb_lookup_user_data, dynamodb_lookup_plant_data], 
         model="amazon.nova-lite-v1:0",
+        region=BEDROCK_REGION,
     )
 
     try:

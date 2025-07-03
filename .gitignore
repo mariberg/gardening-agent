@@ -1,3 +1,25 @@
 */python
 *.zip
-.DS_Store
+*.DS_Store
+*.kiro
+
+# CloudFormation
+*.template
+cloudformation/packaged-*.yaml
+cloudformation/outputs/
+.aws-sam/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local

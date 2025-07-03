@@ -1,10 +1,24 @@
 ## Gardening Agent
 
-This gardening agent has been built using the AWS Strands Agents SDK. The Python code for the agent is located in ```agent.py``` -file and has been deployed using a 
-Lambda function. The agent has access to AI model (Amazon Nova Lite) and utizes three tools. The first tool is a Strands built-in tool 'http_request', which the agent
-can utilize to fetch weather data. In addition there are two custom tools that enable the agent to fetch data from DynamoDB. The agent is able to fetch
-user data, which contains a list of garden plants the user has. The agent is also able to fetch plant-specific details from a second DynamoDB table. Based on this data, the
-AI model is able to create tailored weather-related advice for a user's specific plants.
+This gardening agent has been built using the AWS Strands Agents SDK. The Python code for the agent is located in the `src/agent.py` file and is deployed as an AWS Lambda function. The agent has access to the Amazon Nova Lite AI model and utilizes three tools. The first tool is a Strands built-in tool 'http_request', which the agent can utilize to fetch weather data. In addition there are two custom tools that enable the agent to fetch data from DynamoDB. The agent is able to fetch user data, which contains a list of garden plants the user has. The agent is also able to fetch plant-specific details from a second DynamoDB table. Based on this data, the AI model is able to create tailored weather-related advice for a user's specific plants.
+
+The agent is integrated with AWS CloudFormation for infrastructure deployment and uses environment variables for configuration, making it easily deployable across different environments.
+
+## Project Structure
+
+```
+gardening-agent/
+├── src/
+│   └── agent.py                    # Main Lambda function code
+├── cloudformation/
+│   ├── infrastructure.yaml         # CloudFormation template
+│   └── parameters/
+│       └── dev.json               # Development environment parameters
+├── lambda-layer/
+│   └── requirements.txt           # Python dependencies
+├── images/                        # Documentation images
+└── README.md                      # This file
+```
 
 ![diagram](./images/gardening-agent.png)
 
@@ -19,30 +33,90 @@ Both plants are currently within their ideal temperature and humidity ranges. Ho
 rising above the ideal range for both plants. Consider providing some shade or shelter to protect them from excessive heat.
 ``
 
-## Deploy Agent as a Lambda Function
+## Deployment
 
-The Lambda function requires the following permissions:
+The project includes Infrastructure as Code (IaC) using AWS CloudFormation. This is the recommended deployment method as it ensures consistent and repeatable deployments.
 
-- `dynamodb:GetItem` access for both DynamoDB tables
-- `bedrock:InvokeModelWithResponseStream`
+### Prerequisites
+- AWS CLI configured with appropriate permissions
+- Access to Amazon Bedrock (Nova Lite model) in your AWS account
 
-You can create a Lambda layer based on the `requirements.txt` file to include your Python dependencies.
+### Deploy Infrastructure
+
+1. **Create the CloudFormation stack:**
+```bash
+aws cloudformation create-stack \
+  --stack-name gardening-agent-dev \
+  --template-body file://cloudformation/infrastructure.yaml \
+  --parameters file://cloudformation/parameters/dev.json \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+2. **Wait for stack creation to complete:**
+```bash
+aws cloudformation wait stack-create-complete \
+  --stack-name gardening-agent-dev
+```
+
+3. **Update the Lambda function code:**
+```bash
+# Package your code (include dependencies if not using Lambda layers)
+zip -r function.zip src/
+
+# Update the function
+aws lambda update-function-code \
+  --function-name gardening-agent-dev \
+  --zip-file fileb://function.zip
+```
+
+**Note**: The Lambda function handler is configured as `src.agent.lambda_handler` to match the new project structure. Environment variables for table names and region are automatically set by CloudFormation.
+
+#### Update Infrastructure
+```bash
+aws cloudformation update-stack \
+  --stack-name gardening-agent-dev \
+  --template-body file://cloudformation/infrastructure.yaml \
+  --parameters file://cloudformation/parameters/dev.json \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+### Access to Bedrock
+
+The Lambda function uses Amazon Nova Lite model and access to this model needs to be requested through the Bedrock console. 
 
 
-## Access to Bedrock
+## Infrastructure Components
 
-The Lambda function uses Amazon Nova Lite model and access to these model needs to be requested through the Bedrock console. 
+The CloudFormation template creates the following AWS resources:
 
+- **Lambda Function**: `gardening-agent-dev` with proper IAM permissions and environment variable configuration
+- **IAM Role**: Execution role with DynamoDB and Bedrock access
+- **DynamoDB Tables**: Two tables for user data and plant definitions
+- **Environment Variables**: Automatically configured for:
+  - `USER_DATA_TABLE_NAME`: DynamoDB table name for user data
+  - `PLANT_DEFINITIONS_TABLE_NAME`: DynamoDB table name for plant definitions  
+  - `BEDROCK_REGION`: AWS region for Bedrock model access
 
-## DynamoDB Tables Setup
+## Configuration
 
-This project requires **two DynamoDB tables**:
+The Lambda function now uses environment variables for all configuration, making it environment-agnostic:
+
+- **Table Names**: Dynamically configured via CloudFormation parameters
+- **AWS Region**: Configurable for Bedrock access (defaults to `eu-west-2`)
+- **Fallback Values**: Default values provided for local development
+
+This approach ensures the same code can be deployed across different environments (dev, staging, prod) without modification.
+
+## DynamoDB Tables
+
+The CloudFormation template automatically creates **two DynamoDB tables**:
 
 ---
 
-### 1. `plant_database_users`
+### 1. `plant_database_users-dev`
 
 - **Primary Key**: `user_id` (String)
+- **Purpose**: Stores user location data and their plant lists
 
 #### Example item:
 
@@ -58,9 +132,10 @@ This project requires **two DynamoDB tables**:
 }
 ```
 
-### 2. `garden_plants`
+### 2. `garden_plants-dev`
 
 - **Primary Key**: `plant_id` (String)
+- **Purpose**: Stores detailed plant characteristics and requirements
 
 #### Example item:
 
