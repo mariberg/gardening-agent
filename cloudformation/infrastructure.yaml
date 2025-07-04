@@ -31,6 +31,16 @@ Parameters:
     Default: eu-west-2
     Description: AWS region for Bedrock model access
 
+  CodeS3Bucket:
+    Type: String
+    Default: ""
+    Description: S3 bucket containing Lambda deployment package (optional)
+
+  CodeS3Key:
+    Type: String
+    Default: ""
+    Description: S3 key for Lambda deployment package (optional)
+
 Resources:
   # IAM Role for Lambda Function
   LambdaExecutionRole:
@@ -113,7 +123,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub '${LambdaFunctionName}-${Environment}'
-      Runtime: python3.11
+      Runtime: python3.13
       Handler: src.agent.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
@@ -128,6 +138,106 @@ Resources:
           BEDROCK_REGION: !Ref BedrockRegion
       Timeout: 300
       MemorySize: 512
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # API Gateway REST API
+  GardeningAgentApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${LambdaFunctionName}-api-${Environment}'
+      Description: REST API for Gardening Agent
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # API Gateway Resource for /advice endpoint
+  AdviceResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !GetAtt GardeningAgentApi.RootResourceId
+      PathPart: advice
+
+  # POST Method for /advice endpoint with Lambda proxy integration
+  AdvicePostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref AdviceResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningAgentFunction.Arn}/invocations'
+
+  # OPTIONS Method for CORS preflight requests
+  AdviceOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref AdviceResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # Lambda Permission for API Gateway invocation
+  LambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GardeningAgentFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${GardeningAgentApi}/*/*'
+
+  # API Gateway Deployment
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - AdvicePostMethod
+      - AdviceOptionsMethod
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      Description: !Sub 'Deployment for ${Environment} environment'
+
+  # API Gateway Stage
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      DeploymentId: !Ref ApiGatewayDeployment
+      StageName: !Ref Environment
+      Description: !Sub 'Development stage for ${Environment} environment'
+      Variables:
+        Environment: !Ref Environment
+        LambdaFunctionName: !Ref GardeningAgentFunction
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -176,3 +286,21 @@ Outputs:
     Value: !GetAtt LambdaExecutionRole.Arn
     Export:
       Name: !Sub '${AWS::StackName}-IAMRoleArn'
+
+  ApiGatewayUrl:
+    Description: URL of the API Gateway endpoint
+    Value: !Sub 'https://${GardeningAgentApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStage}/advice'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayUrl'
+
+  ApiGatewayId:
+    Description: ID of the API Gateway
+    Value: !Ref GardeningAgentApi
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayId'
+
+  ApiGatewayStageName:
+    Description: Name of the API Gateway stage
+    Value: !Ref ApiGatewayStage
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayStageName'

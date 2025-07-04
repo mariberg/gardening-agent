@@ -191,7 +191,15 @@ show_deployment_commands() {
 # Main execution
 main() {
     check_dependencies
-    check_aws_cli
+    
+    # Check if --skip-aws-check flag is provided
+    if [[ "$*" != *"--skip-aws-check"* ]]; then
+        check_aws_cli
+    else
+        print_warning "Skipping AWS CLI check (--skip-aws-check flag provided)"
+        echo
+    fi
+    
     validate_template
     validate_parameters
     

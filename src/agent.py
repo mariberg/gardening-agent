@@ -1,8 +1,11 @@
 import boto3
 import os
+import json
+import uuid
+from datetime import datetime, timezone
 from strands import Agent, tool
 from strands_tools import http_request
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # Get configuration from environment variables (set by CloudFormation)
 BEDROCK_REGION = os.environ.get('BEDROCK_REGION', 'eu-west-2')
@@ -37,7 +40,8 @@ def dynamodb_lookup_user_data(user_id: str) -> Dict[str, Any]:
 
         if not item:
             print(f"DynamoDB Tool: No user item found for user_id '{user_id}'.")
-            return {'error': f"No user data found for user ID '{user_id}'. Please ensure it's registered."}
+            # Raise a specific exception that can be caught by error handlers
+            raise ValueError(f"No user data found for user ID '{user_id}'. Please ensure it's registered.")
 
         latitude = item.get('latitude')
         longitude = item.get('longitude')
@@ -50,9 +54,13 @@ def dynamodb_lookup_user_data(user_id: str) -> Dict[str, Any]:
         print(f"DynamoDB Tool: Found user data for '{user_id}': lat={latitude}, lon={longitude}, plants={plants}")
         return {'latitude': float(latitude), 'longitude': float(longitude), 'plants': plants}
 
+    except ValueError:
+        # Re-raise ValueError (user not found) to be handled by main error handler
+        raise
     except Exception as e:
         print(f"DynamoDB Tool Error (User Data): {e}")
-        return {'error': f"A database error occurred while fetching user data for '{user_id}': {str(e)}"}
+        # For other database errors, raise with more context
+        raise Exception(f"DynamoDB error while fetching user data for '{user_id}': {str(e)}")
 
 @tool
 def dynamodb_lookup_plant_data(plant_id: str) -> Dict[str, Any]:
@@ -93,7 +101,7 @@ WEATHER_SYSTEM_PROMPT = """You are a highly knowledgeable **Gardening Weather Ad
 **Here's your comprehensive workflow:**
 
 1.  **Understand User's Request:**
-    * If the user provides a `user_id` (e.g., "Give me plant advice for user_id testuser1"), your first step is to use the `dynamodb_lookup_user_data` tool to get their registered `latitude`, `longitude`, and their `plants` list (a list of plant IDs).
+    * If the user provides a `user_id` (e.g., "Give me plant advice for user_id testuser1"), you MUST immediately use the `dynamodb_lookup_user_data` tool to get their registered `latitude`, `longitude`, and their `plants` list (a list of plant IDs). This is your first and mandatory step.
     * If the user directly provides `latitude` and `longitude` AND a list of specific plant IDs (e.g., "What advice for plant_id 'rose_1', 'sunflower_2' at lat 52.52, lon 13.41?"), skip the initial user data lookup and proceed to step 2 with the provided coordinates and plant IDs.
 
 2.  **Fetch User Data and Plant IDs (if `user_id` provided):**
@@ -156,30 +164,412 @@ You must structure your response as a JSON object with exactly two attributes:
 """
 
 
-def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
-    user_prompt = event.get('prompt')
-
-    if not user_prompt:
-        return {
-            "details": {},
-            "summary": "Error: No user prompt provided in the event. Please provide a user ID or coordinates and optional plant IDs."
-        }
-
-    # Initialize the agent with all necessary tools
-    plant_weather_agent = Agent(
-        system_prompt=WEATHER_SYSTEM_PROMPT,
-        tools=[http_request, dynamodb_lookup_user_data, dynamodb_lookup_plant_data], 
-        model="amazon.nova-lite-v1:0",
-        region=BEDROCK_REGION,
+def is_api_gateway_event(event: Dict[str, Any]) -> bool:
+    """
+    Detect if the event is from API Gateway by checking for API Gateway-specific fields.
+    """
+    return (
+        'httpMethod' in event and 
+        'path' in event and 
+        'headers' in event and
+        'body' in event
     )
 
+
+def parse_api_gateway_request(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse API Gateway proxy event to extract request data.
+    """
     try:
+        # Parse the body if it exists and is a string
+        body = event.get('body')
+        if body and isinstance(body, str):
+            request_data = json.loads(body)
+        elif body and isinstance(body, dict):
+            request_data = body
+        else:
+            request_data = {}
+        
+        # Extract headers (case-insensitive)
+        headers = event.get('headers', {})
+        
+        # Extract query parameters
+        query_params = event.get('queryStringParameters') or {}
+        
+        return {
+            'request_data': request_data,
+            'headers': headers,
+            'query_params': query_params,
+            'http_method': event.get('httpMethod'),
+            'path': event.get('path')
+        }
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in request body: {str(e)}")
+
+
+def create_api_gateway_response(
+    status_code: int, 
+    body: Dict[str, Any] = None, 
+    error_message: str = None,
+    user_id: str = None,
+    weather_conditions: Dict[str, Any] = None,
+    request_id: str = None
+) -> Dict[str, Any]:
+    """
+    Create a properly formatted API Gateway response with CORS headers.
+    Enhanced to include user_id, timestamp, weather conditions, and request tracking.
+    """
+    timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    
+    if error_message:
+        # Error response format
+        response_body = {
+            "statusCode": status_code,
+            "error": get_error_type_from_status(status_code),
+            "message": error_message,
+            "request_id": request_id or str(uuid.uuid4()),
+            "timestamp": timestamp
+        }
+        if user_id:
+            response_body["user_id"] = user_id
+    else:
+        # Success response format
+        response_body = {
+            "statusCode": status_code,
+            "advice": body.get("summary", "") if body else "",
+            "details": body.get("details", {}) if body else {},
+            "timestamp": timestamp
+        }
+        if user_id:
+            response_body["user_id"] = user_id
+        if weather_conditions:
+            response_body["weather_conditions"] = weather_conditions
+    
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+            "Access-Control-Allow-Methods": "POST,OPTIONS"
+        },
+        "body": json.dumps(response_body)
+    }
+
+
+def get_error_type_from_status(status_code: int) -> str:
+    """
+    Map HTTP status codes to error types for consistent error responses.
+    """
+    error_types = {
+        400: "Bad Request",
+        404: "Not Found", 
+        500: "Internal Server Error",
+        503: "Service Unavailable"
+    }
+    return error_types.get(status_code, "Unknown Error")
+
+
+def validate_user_id(user_id: Any) -> tuple[bool, str]:
+    """
+    Validate user_id format and content.
+    
+    Args:
+        user_id: The user_id value to validate
+        
+    Returns:
+        tuple: (is_valid: bool, error_message: str)
+    """
+    if user_id is None:
+        return False, "'user_id' field is required in the request body."
+    
+    if not isinstance(user_id, str):
+        return False, "'user_id' must be a string."
+    
+    if not user_id.strip():
+        return False, "'user_id' cannot be empty or contain only whitespace."
+    
+    # Check for basic format requirements (alphanumeric, underscore, hyphen allowed)
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', user_id.strip()):
+        return False, "'user_id' contains invalid characters. Only letters, numbers, underscores, and hyphens are allowed."
+    
+    # Check length constraints
+    if len(user_id.strip()) < 1:
+        return False, "'user_id' must be at least 1 character long."
+    
+    if len(user_id.strip()) > 50:
+        return False, "'user_id' must be 50 characters or less."
+    
+    return True, ""
+
+
+def handle_database_error(error: Exception, user_id: str = None) -> tuple[int, str]:
+    """
+    Handle database-related errors and return appropriate status code and message.
+    
+    Args:
+        error: The exception that occurred
+        user_id: The user_id that was being processed
+        
+    Returns:
+        tuple: (status_code: int, error_message: str)
+    """
+    error_str = str(error).lower()
+    
+    # Check for user not found errors
+    if "no user data found" in error_str or "no user item found" in error_str:
+        return 404, f"User not found: No user profile found for user_id: {user_id}"
+    
+    # Check for DynamoDB specific errors
+    if "resourcenotfoundexception" in error_str:
+        return 404, f"User not found: No user profile found for user_id: {user_id}"
+    
+    if "accessdeniedexception" in error_str or "unauthorizedoperation" in error_str:
+        return 500, "Database access error. Please contact support."
+    
+    if "throttlingexception" in error_str or "provisionedthroughputexceeded" in error_str:
+        return 503, "Service temporarily unavailable due to high demand. Please try again later."
+    
+    if "validationexception" in error_str:
+        return 400, f"Invalid user_id format: {user_id}"
+    
+    # Generic database error
+    return 500, "A database error occurred while processing your request."
+
+
+def handle_ai_service_error(error: Exception) -> tuple[int, str]:
+    """
+    Handle AI service (Bedrock) related errors and return appropriate status code and message.
+    
+    Args:
+        error: The exception that occurred
+        
+    Returns:
+        tuple: (status_code: int, error_message: str)
+    """
+    error_str = str(error).lower()
+    
+    # Check for Bedrock specific errors
+    if "bedrock" in error_str or "nova" in error_str:
+        if "throttling" in error_str or "rate" in error_str:
+            return 503, "AI service temporarily unavailable due to high demand. Please try again later."
+        elif "access" in error_str or "unauthorized" in error_str:
+            return 500, "AI service access error. Please contact support."
+        else:
+            return 503, "AI service temporarily unavailable. Please try again later."
+    
+    # Check for weather service errors
+    if "weather" in error_str or "open-meteo" in error_str or "http_request" in error_str:
+        return 503, "Weather service temporarily unavailable. Please try again later."
+    
+    # Generic service error
+    return 503, "External service temporarily unavailable. Please try again later."
+
+
+def extract_weather_conditions_from_response(agent_response: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Extract weather conditions from the agent response for frontend display.
+    This parses the agent's detailed response to find weather information.
+    """
+    try:
+        # Look for weather information in the summary or details
+        summary = agent_response.get("summary", "")
+        details = agent_response.get("details", {})
+        
+        # Initialize weather conditions structure
+        weather_conditions = {}
+        
+        # Try to extract temperature, humidity, and general conditions from the response text
+        # This is a simple extraction - in a production system, you might want to 
+        # store weather data separately during the agent processing
+        
+        # Look for temperature mentions
+        import re
+        temp_match = re.search(r'(\d+)°?[CF]?', summary + " " + str(details))
+        if temp_match:
+            weather_conditions["temperature"] = int(temp_match.group(1))
+        
+        # Look for humidity mentions
+        humidity_match = re.search(r'(\d+)%.*humidity|humidity.*(\d+)%', summary + " " + str(details), re.IGNORECASE)
+        if humidity_match:
+            humidity_value = humidity_match.group(1) or humidity_match.group(2)
+            weather_conditions["humidity"] = int(humidity_value)
+        
+        # Look for general weather conditions (order matters - more specific first)
+        weather_keywords = ["partly cloudy", "overcast", "sunny", "cloudy", "rainy", "windy", "clear"]
+        text_to_search = (summary + " " + str(details)).lower()
+        for keyword in weather_keywords:
+            if keyword in text_to_search:
+                weather_conditions["condition"] = keyword
+                break
+        
+        # Only return weather conditions if we found at least one piece of weather data
+        return weather_conditions if weather_conditions else None
+        
+    except Exception as e:
+        print(f"Error extracting weather conditions: {e}")
+        return None
+
+
+def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
+    """
+    Lambda handler that supports both direct invocation and API Gateway proxy events.
+    Enhanced with improved response formatting including user_id, timestamp, and weather conditions.
+    """
+    request_id = str(uuid.uuid4())
+    user_id = None
+    
+    try:
+        # Check if this is an API Gateway event
+        if is_api_gateway_event(event):
+            print(f"Processing API Gateway event - Request ID: {request_id}")
+            
+            # Handle OPTIONS request for CORS preflight
+            if event.get('httpMethod') == 'OPTIONS':
+                return create_api_gateway_response(200, {}, request_id=request_id)
+            
+            # Parse API Gateway request
+            try:
+                parsed_request = parse_api_gateway_request(event)
+                request_data = parsed_request['request_data']
+                
+                # Extract user_id from request data
+                user_id = request_data.get('user_id')
+                
+                # Validate user_id using enhanced validation
+                is_valid, validation_error = validate_user_id(user_id)
+                if not is_valid:
+                    return create_api_gateway_response(
+                        400, 
+                        error_message=validation_error,
+                        user_id=user_id if isinstance(user_id, str) else None,
+                        request_id=request_id
+                    )
+                
+                # Clean the user_id (strip whitespace)
+                user_id = user_id.strip()
+                
+                # Construct prompt from user_id - this will trigger the dynamodb_lookup_user_data tool
+                user_prompt = f"Give me plant advice for user_id {user_id}"
+                
+            except ValueError as e:
+                return create_api_gateway_response(
+                    400, 
+                    error_message=f"Invalid request format: {str(e)}",
+                    user_id=user_id,
+                    request_id=request_id
+                )
+            except Exception as e:
+                return create_api_gateway_response(
+                    500, 
+                    error_message=f"Failed to parse request: {str(e)}",
+                    user_id=user_id,
+                    request_id=request_id
+                )
+        
+        else:
+            print(f"Processing direct Lambda invocation - Request ID: {request_id}")
+            # Direct Lambda invocation - support both user_id and prompt formats
+            user_id = event.get('user_id')
+            user_prompt = event.get('prompt')
+            
+            if user_id:
+                # Validate user_id format using enhanced validation
+                is_valid, validation_error = validate_user_id(user_id)
+                if not is_valid:
+                    return {
+                        "details": {},
+                        "summary": f"Error: {validation_error}",
+                        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+                        "user_id": user_id if isinstance(user_id, str) else None,
+                        "request_id": request_id
+                    }
+                # Clean the user_id (strip whitespace)
+                user_id = user_id.strip()
+                # Construct prompt from user_id - this will trigger the dynamodb_lookup_user_data tool
+                user_prompt = f"Give me plant advice for user_id {user_id}"
+            elif user_prompt:
+                # Use existing prompt (backward compatibility)
+                pass
+            else:
+                return {
+                    "details": {},
+                    "summary": "Error: Either 'user_id' or 'prompt' must be provided in the event.",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+                    "request_id": request_id
+                }
+
+        # Initialize the agent with all necessary tools
+        plant_weather_agent = Agent(
+            system_prompt=WEATHER_SYSTEM_PROMPT,
+            tools=[http_request, dynamodb_lookup_user_data, dynamodb_lookup_plant_data], 
+            model="amazon.nova-lite-v1:0",
+            region=BEDROCK_REGION,
+        )
+
+        # Process the request
+        print(f"Processing agent request for user_id: {user_id}")
         response = plant_weather_agent(user_prompt)
-        # The response should already be in the correct JSON format as specified in the prompt
-        return response
+        
+        # Extract weather conditions from the agent response
+        weather_conditions = extract_weather_conditions_from_response(response)
+        
+        # Return appropriate response format
+        if is_api_gateway_event(event):
+            return create_api_gateway_response(
+                200, 
+                response, 
+                user_id=user_id,
+                weather_conditions=weather_conditions,
+                request_id=request_id
+            )
+        else:
+            # Direct invocation - return enhanced response format
+            enhanced_response = {
+                "advice": response.get("summary", ""),
+                "details": response.get("details", {}),
+                "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+                "request_id": request_id
+            }
+            if user_id:
+                enhanced_response["user_id"] = user_id
+            if weather_conditions:
+                enhanced_response["weather_conditions"] = weather_conditions
+            return enhanced_response
+            
     except Exception as e:
         print(f"Agent processing error: {e}")
-        return {
-            "details": {},
-            "summary": f"An internal error occurred while processing your request: {str(e)}"
-        }
+        
+        # Determine error type and appropriate response
+        error_str = str(e).lower()
+        
+        # Check for database-related errors first
+        if any(keyword in error_str for keyword in ["dynamodb", "database", "user data", "user item"]):
+            status_code, error_message = handle_database_error(e, user_id)
+        # Check for AI service or weather service errors
+        elif any(keyword in error_str for keyword in ["bedrock", "nova", "weather", "http_request", "service"]):
+            status_code, error_message = handle_ai_service_error(e)
+        else:
+            # Generic internal server error
+            status_code = 500
+            error_message = "An internal error occurred while processing your request."
+        
+        # Log detailed error for debugging (but don't expose to user)
+        print(f"Detailed error for request {request_id}: {str(e)}")
+        
+        if is_api_gateway_event(event):
+            return create_api_gateway_response(
+                status_code, 
+                error_message=error_message,
+                user_id=user_id,
+                request_id=request_id
+            )
+        else:
+            return {
+                "details": {},
+                "summary": error_message,
+                "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+                "user_id": user_id,
+                "request_id": request_id
+            }
