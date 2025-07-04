@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garden Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <span class="plant-icon">🌱</span>
+                <h1>Garden Assistant</h1>
+            </div>
+            <p class="subtitle">Your personal AI gardening companion</p>
+        </header>
+
+        <main class="main-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Daily Garden Update</h2>
+                    <p>Get personalized gardening advice based on your garden setup and current weather conditions.</p>
+                </div>
+                
+                <div class="card-body">
+                    <button id="getUpdateBtn" class="update-button">
+                        <span class="button-icon">🌿</span>
+                        Get Gardening Update
+                    </button>
+                </div>
+
+                <div id="loadingState" class="loading-state hidden">
+                    <div class="spinner"></div>
+                    <p>Getting your personalized gardening advice...</p>
+                </div>
+
+                <div id="resultContainer" class="result-container hidden">
+                    <div class="result-header">
+                        <h3>Your Garden Update</h3>
+                        <div id="timestamp" class="timestamp"></div>
+                    </div>
+                    <div id="weatherInfo" class="weather-info hidden">
+                        <h4>Current Conditions</h4>
+                        <div id="weatherDetails" class="weather-details"></div>
+                    </div>
+                    <div id="adviceContent" class="advice-content"></div>
+                </div>
+
+                <div id="errorContainer" class="error-container hidden">
+                    <div class="error-icon">⚠️</div>
+                    <h3>Oops! Something went wrong</h3>
+                    <p id="errorMessage"></p>
+                    <button id="retryBtn" class="retry-button">Try Again</button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>Powered by AI • Weather-aware gardening advice</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

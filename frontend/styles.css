@@ -1,0 +1,330 @@
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #2d5016 0%, #4a7c59 50%, #68a085 100%);
+    min-height: 100vh;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header styles */
+.header {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: white;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.plant-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.header h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    font-weight: 300;
+}
+
+/* Main content */
+.main-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 600px;
+    transition: transform 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.card-header h2 {
+    font-size: 1.8rem;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.card-header p {
+    color: #718096;
+    font-size: 1rem;
+}
+
+.card-body {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+/* Button styles */
+.update-button {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border-radius: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+.update-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+}
+
+.update-button:active {
+    transform: translateY(0);
+}
+
+.update-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.button-icon {
+    font-size: 1.2rem;
+}
+
+.retry-button {
+    background: #4299e1;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+    background: #3182ce;
+}
+
+/* Loading state */
+.loading-state {
+    text-align: center;
+    padding: 2rem 0;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e2e8f0;
+    border-top: 3px solid #48bb78;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+    color: #718096;
+    font-style: italic;
+}
+
+/* Result container */
+.result-container {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 2rem;
+    margin-top: 1rem;
+}
+
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.result-header h3 {
+    color: #2d3748;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.timestamp {
+    color: #718096;
+    font-size: 0.85rem;
+    background: #f7fafc;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+}
+
+/* Weather info */
+.weather-info {
+    background: linear-gradient(135deg, #e6fffa 0%, #b2f5ea 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #38b2ac;
+}
+
+.weather-info h4 {
+    color: #234e52;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.weather-details {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.weather-item {
+    background: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #2d3748;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Advice content */
+.advice-content {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border-left: 4px solid #48bb78;
+}
+
+.advice-content p {
+    margin-bottom: 1rem;
+    color: #2d3748;
+    line-height: 1.7;
+}
+
+.advice-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Error container */
+.error-container {
+    text-align: center;
+    padding: 2rem;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 1rem;
+}
+
+.error-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.error-container h3 {
+    color: #e53e3e;
+    margin-bottom: 0.5rem;
+    font-size: 1.3rem;
+}
+
+.error-container p {
+    color: #718096;
+    margin-bottom: 1.5rem;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    margin-top: 3rem;
+    color: white;
+    opacity: 0.8;
+    font-size: 0.9rem;
+}
+
+/* Utility classes */
+.hidden {
+    display: none;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+    
+    .card {
+        padding: 1.5rem;
+    }
+    
+    .result-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+    
+    .weather-details {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .update-button {
+        width: 100%;
+        justify-content: center;
+    }
+}
