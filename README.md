@@ -1,4 +1,4 @@
-## Gardening Agent
+# Gardening Agent
 
 The Gardening Agent is an AI-powered assistant that provides personalized plant care advice based on your specific garden plants and current weather conditions. Simply provide your user ID, and the agent automatically looks up what plants you're growing, checks the local weather forecast, and generates tailored recommendations for each plant in your garden.
 
@@ -37,18 +37,40 @@ rising above the ideal range for both plants. Consider providing some shade or s
 
 ## Deployment
 
-The project includes Infrastructure as Code (IaC) using AWS CloudFormation. This is the recommended deployment method as it ensures consistent and repeatable deployments.
+The project includes Infrastructure as Code (IaC) using AWS CloudFormation. 
+
+The CloudFormation template creates the following AWS resources:
+
+- **Lambda Function**: `gardening-agent-dev` running Python 3.13 runtime with proper IAM permissions and environment variable configuration
+- **IAM Execution Role**: Comprehensive role with policies for:
+  - Basic Lambda execution (CloudWatch Logs)
+  - DynamoDB access (GetItem, PutItem, UpdateItem, DeleteItem, Query, Scan)
+  - Amazon Bedrock access (InvokeModel, InvokeModelWithResponseStream) for Nova Lite model
+- **API Gateway REST API**: Complete API setup including:
+  - REST API with regional endpoint configuration
+  - `/advice` resource endpoint
+  - POST method with Lambda proxy integration
+  - OPTIONS method for CORS preflight requests
+  - API Gateway deployment and stage management
+- **DynamoDB Tables**: Two pay-per-request tables with proper tagging:
+  - User data table with `user_id` as primary key
+  - Plant definitions table with `plant_id` as primary key
+- **Lambda Permissions**: Allows API Gateway to invoke the Lambda function
+- **Environment Variables**: Automatically configured for:
+  - `USER_DATA_TABLE_NAME`: DynamoDB table name for user data
+  - `PLANT_DEFINITIONS_TABLE_NAME`: DynamoDB table name for plant definitions  
+  - `BEDROCK_REGION`: AWS region for Bedrock model access
 
 ### Prerequisites
 - AWS CLI configured with appropriate permissions
 - Access to Amazon Bedrock (Nova Lite model) in your AWS account
- 
 
-### API Gateway Integration
+
+## API Gateway Integration
 
 The Lambda function supports HTTP API access through API Gateway integration. 
 
-#### API Request Format
+### API Request Format
 
 When calling through API Gateway, send a POST request with JSON body containing only the user ID:
 
@@ -58,7 +80,7 @@ When calling through API Gateway, send a POST request with JSON body containing 
 }
 ```
 
-#### API Response Format
+### API Response Format
 
 The API returns a structured JSON response with enhanced metadata:
 
@@ -93,7 +115,7 @@ The API returns a structured JSON response with enhanced metadata:
 }
 ```
 
-#### Example API Usage
+### Example API Usage
 
 ```bash
 # Using curl to call the API (note the /dev/advice path structure)
@@ -107,35 +129,6 @@ curl -X OPTIONS https://your-api-gateway-id.execute-api.region.amazonaws.com/dev
   -H "Access-Control-Request-Headers: Content-Type"
 ```
 
-
-### Access to Bedrock
-
-The Lambda function uses Amazon Nova Lite model and access to this model needs to be requested through the Bedrock console. The CloudFormation template automatically configures the necessary IAM permissions for Bedrock access in the specified region. 
-
-
-## Infrastructure Components
-
-The CloudFormation template creates the following AWS resources:
-
-- **Lambda Function**: `gardening-agent-dev` running Python 3.13 runtime with proper IAM permissions and environment variable configuration
-- **IAM Execution Role**: Comprehensive role with policies for:
-  - Basic Lambda execution (CloudWatch Logs)
-  - DynamoDB access (GetItem, PutItem, UpdateItem, DeleteItem, Query, Scan)
-  - Amazon Bedrock access (InvokeModel, InvokeModelWithResponseStream) for Nova Lite model
-- **API Gateway REST API**: Complete API setup including:
-  - REST API with regional endpoint configuration
-  - `/advice` resource endpoint
-  - POST method with Lambda proxy integration
-  - OPTIONS method for CORS preflight requests
-  - API Gateway deployment and stage management
-- **DynamoDB Tables**: Two pay-per-request tables with proper tagging:
-  - User data table with `user_id` as primary key
-  - Plant definitions table with `plant_id` as primary key
-- **Lambda Permissions**: Allows API Gateway to invoke the Lambda function
-- **Environment Variables**: Automatically configured for:
-  - `USER_DATA_TABLE_NAME`: DynamoDB table name for user data
-  - `PLANT_DEFINITIONS_TABLE_NAME`: DynamoDB table name for plant definitions  
-  - `BEDROCK_REGION`: AWS region for Bedrock model access
 
 
 ## DynamoDB Tables
