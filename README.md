@@ -196,6 +196,7 @@ The CloudFormation template automatically creates **two DynamoDB tables**:
   "protection_methods": "Use windbreaks and fungicide in wet seasons",
   "growth_stage": "vegetative"
 }
+```
 
 ## Work in Progress
 
