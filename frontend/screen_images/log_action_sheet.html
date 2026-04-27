@@ -1,0 +1,297 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+
+.bg {
+  background: rgba(0,0,0,0.35);
+  min-height: 640px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+}
+
+.sheet {
+  background: var(--color-background-primary);
+  border-radius: 20px 20px 0 0;
+  border-top: 0.5px solid var(--color-border-secondary);
+  padding: 0 0 16px;
+}
+
+.handle { width: 36px; height: 4px; background: var(--color-border-secondary); border-radius: 2px; margin: 12px auto 0; }
+
+.sheet-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 0;
+}
+.plant-ctx { display: flex; align-items: center; gap: 8px; }
+.plant-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: #EAF3DE;
+  display: flex; align-items: center; justify-content: center;
+}
+.plant-icon svg { width: 16px; height: 16px; }
+.plant-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.plant-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 1px; }
+.close-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.close-btn svg { width: 14px; height: 14px; }
+
+.section-label {
+  font-size: 11px; font-weight: 500; color: var(--color-text-secondary);
+  padding: 14px 16px 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.action-btn {
+  background: var(--color-background-secondary);
+  border: 1.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 10px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.action-btn.selected {
+  border-color: #3B6D11;
+  background: #EAF3DE;
+}
+.action-icon {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.action-icon svg { width: 16px; height: 16px; }
+.action-label { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
+.action-sub { font-size: 10px; color: var(--color-text-secondary); margin-top: 2px; }
+
+.action-btn.selected .action-label { color: #27500A; }
+.action-btn.selected .action-sub { color: #3B6D11; }
+
+.detail-section { padding: 12px 16px 0; }
+
+.field-label { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 6px; }
+
+.notes-input {
+  width: 100%;
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  resize: none;
+  line-height: 1.5;
+}
+
+.severity-row { display: flex; gap: 6px; margin-bottom: 0; }
+.sev-chip {
+  padding: 6px 12px; border-radius: 20px; font-size: 11px;
+  border: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+  background: var(--color-background-secondary);
+  cursor: pointer;
+}
+.sev-chip.sel-mild { background: #EAF3DE; border-color: #639922; color: #27500A; }
+.sev-chip.sel-moderate { background: #FAEEDA; border-color: #EF9F27; color: #633806; }
+.sev-chip.sel-severe { background: #FCEBEB; border-color: #E24B4A; color: #A32D2D; }
+
+.photo-row {
+  display: flex; gap: 8px; margin-top: 4px;
+}
+.photo-add {
+  width: 56px; height: 56px; border-radius: var(--border-radius-md);
+  border: 1px dashed var(--color-border-secondary);
+  background: var(--color-background-secondary);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; gap: 3px;
+}
+.photo-add svg { width: 18px; height: 18px; }
+.photo-add span { font-size: 10px; color: var(--color-text-secondary); }
+
+.divider { height: 0.5px; background: var(--color-border-tertiary); margin: 14px 16px 0; }
+
+.submit-row { padding: 12px 16px 0; display: flex; gap: 8px; }
+.submit-btn {
+  flex: 1; background: #2D4A1E; color: #c8ddb8;
+  border: none; border-radius: var(--border-radius-md);
+  padding: 13px; font-size: 13px; font-weight: 500;
+  font-family: var(--font-sans); cursor: pointer;
+}
+.save-draft {
+  padding: 13px 14px;
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 13px; color: var(--color-text-secondary);
+  font-family: var(--font-sans); cursor: pointer;
+}
+
+.hidden { display: none; }
+.issue-only { display: none; }
+</style>
+
+<h2 class="sr-only">Log action bottom sheet mockup — tap an action type then fill in optional details and submit</h2>
+
+<div class="bg">
+  <div class="sheet">
+    <div class="handle"></div>
+
+    <div class="sheet-header">
+      <div class="plant-ctx">
+        <div class="plant-icon">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 14V6M8 6C8 4 6 2 3 2c0 3 2 5 5 6zM8 6c0-2 2-4 5-4 0 3-2 5-5 6z" stroke="#3B6D11" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="plant-name">Cherry Tomato</div>
+          <div class="plant-sub">Raised bed A · Wed 23 Apr</div>
+        </div>
+      </div>
+      <div class="close-btn">
+        <svg viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="var(--color-text-secondary)" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+
+    <div class="section-label">What did you do?</div>
+
+    <div class="action-grid">
+      <button class="action-btn selected" data-type="watered" onclick="selectAction(this, 'watered')">
+        <div class="action-icon" style="background:#E6F1FB;">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 2C6 2 4 5 4 8a4 4 0 008 0c0-3-2-6-4-6z" stroke="#185FA5" stroke-width="1.2" fill="none"/></svg>
+        </div>
+        <div>
+          <div class="action-label">Watered</div>
+          <div class="action-sub">Log watering</div>
+        </div>
+      </button>
+
+      <button class="action-btn" data-type="pruned" onclick="selectAction(this, 'pruned')">
+        <div class="action-icon" style="background:#EAF3DE;">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M3 13l4-4m0 0l5-6M7 9l-2-2" stroke="#3B6D11" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="5" r="2" stroke="#3B6D11" stroke-width="1.2"/></svg>
+        </div>
+        <div>
+          <div class="action-label">Pruned</div>
+          <div class="action-sub">Trimming, shaping</div>
+        </div>
+      </button>
+
+      <button class="action-btn" data-type="fertilised" onclick="selectAction(this, 'fertilised')">
+        <div class="action-icon" style="background:#FAEEDA;">
+          <svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="10" rx="4" ry="3" stroke="#854F0B" stroke-width="1.2"/><path d="M8 7V3M6 5l2-2 2 2" stroke="#854F0B" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="action-label">Fertilised</div>
+          <div class="action-sub">Feed applied</div>
+        </div>
+      </button>
+
+      <button class="action-btn" data-type="issue" onclick="selectAction(this, 'issue')">
+        <div class="action-icon" style="background:#FCEBEB;">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#A32D2D" stroke-width="1.2"/><path d="M8 5v4M8 10.5v1" stroke="#A32D2D" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div class="action-label">Issue found</div>
+          <div class="action-sub">Pest, disease, damage</div>
+        </div>
+      </button>
+
+      <button class="action-btn" data-type="repotted" onclick="selectAction(this, 'repotted')">
+        <div class="action-icon" style="background:#EAF3DE;">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M5 9h6l-1 5H6L5 9z" stroke="#3B6D11" stroke-width="1.2" stroke-linejoin="round"/><path d="M4 9h8M8 9V5" stroke="#3B6D11" stroke-width="1.2" stroke-linecap="round"/><path d="M6 5c0-1.1.9-2 2-2s2 .9 2 2" stroke="#3B6D11" stroke-width="1.2"/></svg>
+        </div>
+        <div>
+          <div class="action-label">Repotted</div>
+          <div class="action-sub">New pot or soil</div>
+        </div>
+      </button>
+
+      <button class="action-btn" data-type="other" onclick="selectAction(this, 'other')">
+        <div class="action-icon" style="background:var(--color-background-secondary);">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="5" cy="8" r="1" fill="var(--color-text-secondary)"/><circle cx="8" cy="8" r="1" fill="var(--color-text-secondary)"/><circle cx="11" cy="8" r="1" fill="var(--color-text-secondary)"/></svg>
+        </div>
+        <div>
+          <div class="action-label">Other</div>
+          <div class="action-sub">Custom note</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="detail-section">
+      <div id="issue-severity" class="issue-only" style="margin-bottom:12px;">
+        <div class="field-label">Severity</div>
+        <div class="severity-row">
+          <div class="sev-chip" onclick="selectSev(this,'mild')">Mild</div>
+          <div class="sev-chip sel-moderate" onclick="selectSev(this,'moderate')">Moderate</div>
+          <div class="sev-chip" onclick="selectSev(this,'severe')">Severe</div>
+        </div>
+      </div>
+
+      <div class="field-label">Notes <span style="font-weight:400;color:var(--color-text-tertiary);">(optional)</span></div>
+      <textarea class="notes-input" id="notes-field" rows="3" placeholder="e.g. watered 2L at base, soil was quite dry..."></textarea>
+
+      <div style="margin-top:12px;">
+        <div class="field-label">Photo <span style="font-weight:400;color:var(--color-text-tertiary);">(optional)</span></div>
+        <div class="photo-row">
+          <div class="photo-add">
+            <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="11" rx="2" stroke="var(--color-text-secondary)" stroke-width="1.2"/><circle cx="9" cy="9.5" r="2.5" stroke="var(--color-text-secondary)" stroke-width="1.2"/><path d="M6 4l1-2h4l1 2" stroke="var(--color-text-secondary)" stroke-width="1.2" stroke-linejoin="round"/></svg>
+            <span>Add</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="submit-row">
+      <button class="save-draft">Draft</button>
+      <button class="submit-btn" id="submit-btn">Log watered</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const labels = {
+  watered: 'Log watered',
+  pruned: 'Log pruned',
+  fertilised: 'Log fertilised',
+  issue: 'Log issue',
+  repotted: 'Log repotted',
+  other: 'Log action',
+};
+const placeholders = {
+  watered: 'e.g. watered 2L at base, soil was quite dry...',
+  pruned: 'e.g. removed 4 lateral shoots, plant looking vigorous...',
+  fertilised: 'e.g. half-strength tomato feed, first flowers forming...',
+  issue: 'e.g. white powdery coating on lower leaves, two affected...',
+  repotted: 'e.g. moved to 30cm pot, used peat-free compost...',
+  other: 'Describe what you did...',
+};
+
+function selectAction(btn, type) {
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('submit-btn').textContent = labels[type];
+  document.getElementById('notes-field').placeholder = placeholders[type];
+  const sev = document.getElementById('issue-severity');
+  sev.style.display = type === 'issue' ? 'block' : 'none';
+}
+
+function selectSev(chip, level) {
+  document.querySelectorAll('.sev-chip').forEach(c => c.className = 'sev-chip');
+  chip.classList.add('sel-' + level);
+}
+</script>

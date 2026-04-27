@@ -74,13 +74,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-**/python
-**.zip
-**.DS_Store
-**.kiro
+*/python
+*.zip
+*.DS_Store
+*.kiro
 
 # CloudFormation
-**.template
+*.template
 cloudformation/packaged-*.yaml
 cloudformation/outputs/
 .aws-sam/
@@ -93,8 +93,8 @@ dist/
 # IDE and editor files
 .vscode/
 .idea/
-**.swp
-**.swo
+*.swp
+*.swo
 
 # Environment files
 .env

@@ -1,0 +1,233 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.wrap { display: flex; gap: 16px; overflow-x: auto; padding: 1rem 0.5rem 1.5rem; scrollbar-width: none; align-items: flex-start; }
+.wrap::-webkit-scrollbar { display: none; }
+.phone { width: 210px; background: var(--color-background-primary); border-radius: 28px; border: 0.5px solid var(--color-border-secondary); overflow: hidden; flex-shrink: 0; font-family: var(--font-sans); }
+.sbar { background: #2D4A1E; height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+.sbar span { color: #a8c890; font-size: 10px; }
+.scroll { max-height: 480px; overflow-y: auto; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+.lbl { text-align: center; font-size: 11px; color: var(--color-text-secondary); margin-top: 8px; }
+.nav { display: flex; justify-content: space-around; padding: 7px 0 9px; border-top: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); }
+.ni { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 8px; color: var(--color-text-secondary); }
+.ni.active { color: #3B6D11; }
+.ni svg { width: 16px; height: 16px; }
+
+/* Screen 1 - photo tab on plant detail */
+.hero { background: #2D4A1E; padding: 10px 14px 12px; }
+.back-btn { font-size: 10px; color: #a8c890; margin-bottom: 6px; display: flex; align-items: center; gap: 3px; }
+.detail-name { font-size: 16px; font-weight: 500; color: #e8f0e1; }
+.detail-sub { font-size: 11px; color: #7fb86a; margin-top: 1px; }
+.tab-row { display: flex; padding: 0 14px; border-bottom: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); }
+.tab { padding: 8px 12px; font-size: 11px; color: var(--color-text-secondary); border-bottom: 2px solid transparent; cursor: pointer; }
+.tab.active { color: #3B6D11; border-bottom-color: #3B6D11; font-weight: 500; }
+
+.filter-row { display: flex; gap: 6px; padding: 10px 14px 6px; overflow-x: auto; scrollbar-width: none; }
+.filter-row::-webkit-scrollbar { display: none; }
+.f-chip { padding: 4px 10px; border-radius: 20px; font-size: 10px; white-space: nowrap; border: 0.5px solid var(--color-border-secondary); color: var(--color-text-secondary); background: transparent; cursor: pointer; flex-shrink: 0; }
+.f-chip.active { background: #2D4A1E; color: #c8ddb8; border-color: #2D4A1E; }
+
+.month-group { padding: 0 14px 12px; }
+.month-label { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 0 6px; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.photo-cell { aspect-ratio: 1; border-radius: 4px; position: relative; overflow: hidden; cursor: pointer; }
+.photo-cell .photo-bg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.photo-cell .tag { position: absolute; bottom: 3px; left: 3px; border-radius: 3px; padding: 1px 5px; font-size: 8px; font-weight: 500; }
+.tag-issue { background: rgba(162,45,45,0.85); color: #fff; }
+.tag-healthy { background: rgba(45,74,30,0.8); color: #c8ddb8; }
+.tag-pruned { background: rgba(55,138,221,0.8); color: #fff; }
+.photo-cell .ai-flag { position: absolute; top: 3px; right: 3px; width: 14px; height: 14px; border-radius: 50%; background: rgba(45,74,30,0.85); display: flex; align-items: center; justify-content: center; }
+.ai-flag svg { width: 8px; height: 8px; }
+
+/* Screen 2 - fullscreen photo + AI analysis */
+.full-photo { width: 100%; height: 200px; background: #b5c9a0; display: flex; align-items: center; justify-content: center; position: relative; }
+.full-photo-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.5) 100%); }
+.photo-nav-top { position: absolute; top: 10px; left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 14px; z-index: 2; }
+.photo-nav-btn { font-size: 10px; color: #fff; display: flex; align-items: center; gap: 4px; }
+.photo-date { position: absolute; bottom: 10px; left: 14px; z-index: 2; }
+.photo-date-main { font-size: 12px; font-weight: 500; color: #fff; }
+.photo-date-sub { font-size: 10px; color: rgba(255,255,255,0.7); margin-top: 1px; }
+.photo-counter { position: absolute; bottom: 10px; right: 14px; z-index: 2; font-size: 10px; color: rgba(255,255,255,0.8); }
+
+.analysis-card { margin: 10px 14px; background: #FCEBEB; border-radius: 10px; border: 0.5px solid #F7C1C1; overflow: hidden; }
+.analysis-hd { padding: 8px 10px; display: flex; align-items: center; gap: 6px; border-bottom: 0.5px solid #F7C1C1; }
+.analysis-hd svg { width: 13px; height: 13px; flex-shrink: 0; }
+.analysis-hd span { font-size: 11px; font-weight: 500; color: #A32D2D; }
+.analysis-body { padding: 8px 10px; font-size: 11px; color: #633806; line-height: 1.5; }
+.analysis-compare { padding: 0 10px 10px; }
+.compare-label { font-size: 10px; color: #854F0B; margin-bottom: 5px; }
+.compare-row { display: flex; gap: 5px; }
+.compare-thumb { flex: 1; aspect-ratio: 1.5; border-radius: 5px; background: #d4c9b0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+.compare-thumb span { position: absolute; bottom: 3px; left: 4px; font-size: 8px; color: rgba(0,0,0,0.6); }
+
+.timeline-strip { padding: 10px 14px; }
+.ts-label { font-size: 10px; color: var(--color-text-secondary); margin-bottom: 6px; font-weight: 500; }
+.ts-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.ts-row::-webkit-scrollbar { display: none; }
+.ts-thumb { width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0; cursor: pointer; border: 2px solid transparent; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.ts-thumb.active { border-color: #3B6D11; }
+.ts-thumb-dot { position: absolute; bottom: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.6); }
+
+.action-pills { display: flex; gap: 6px; padding: 0 14px 12px; flex-wrap: wrap; }
+.pill { padding: 6px 12px; border-radius: 20px; font-size: 11px; border: 0.5px solid var(--color-border-secondary); color: var(--color-text-primary); background: var(--color-background-secondary); cursor: pointer; }
+.pill.primary { background: #2D4A1E; color: #c8ddb8; border-color: #2D4A1E; }
+</style>
+
+<div class="wrap">
+
+  <!-- Screen 1: Photo tab on plant detail -->
+  <div>
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span>●●●</span></div>
+      <div class="scroll">
+        <div class="hero">
+          <div class="back-btn">← Garden</div>
+          <div class="detail-name">Courgette</div>
+          <div class="detail-sub">Raised bed B · Planted 2 Mar 2025</div>
+        </div>
+
+        <div class="tab-row">
+          <div class="tab">Overview</div>
+          <div class="tab">History</div>
+          <div class="tab active">Photos</div>
+          <div class="tab">Care</div>
+        </div>
+
+        <div class="filter-row">
+          <div class="f-chip active">All</div>
+          <div class="f-chip">Issues</div>
+          <div class="f-chip">Healthy</div>
+          <div class="f-chip">After care</div>
+        </div>
+
+        <div class="month-group">
+          <div class="month-label">April 2025</div>
+          <div class="photo-grid">
+            <div class="photo-cell" onclick="openPhoto()">
+              <div class="photo-bg" style="background:#c8a882;">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="12" rx="2" stroke="rgba(0,0,0,0.3)" stroke-width="1.3"/><circle cx="10" cy="11" r="3" stroke="rgba(0,0,0,0.3)" stroke-width="1.3"/></svg>
+              </div>
+              <div class="tag tag-issue">Issue</div>
+              <div class="ai-flag"><svg viewBox="0 0 8 8" fill="none"><circle cx="4" cy="4" r="3.5" fill="#7fb86a"/><path d="M2.5 4a1.5 1.5 0 013 0 1.5 1.5 0 01-3 0z" fill="#fff"/></svg></div>
+            </div>
+            <div class="photo-cell">
+              <div class="photo-bg" style="background:#a8be8a;">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="12" rx="2" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/><circle cx="10" cy="11" r="3" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/></svg>
+              </div>
+              <div class="tag tag-healthy">Healthy</div>
+            </div>
+            <div class="photo-cell">
+              <div class="photo-bg" style="background:#b5c9a0;">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="12" rx="2" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/><circle cx="10" cy="11" r="3" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/></svg>
+              </div>
+              <div class="tag tag-pruned">Pruned</div>
+              <div class="ai-flag"><svg viewBox="0 0 8 8" fill="none"><circle cx="4" cy="4" r="3.5" fill="#7fb86a"/><path d="M2.5 4a1.5 1.5 0 013 0 1.5 1.5 0 01-3 0z" fill="#fff"/></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="month-group">
+          <div class="month-label">March 2025</div>
+          <div class="photo-grid">
+            <div class="photo-cell">
+              <div class="photo-bg" style="background:#c5d4aa;">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="12" rx="2" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/><circle cx="10" cy="11" r="3" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/></svg>
+              </div>
+              <div class="tag tag-healthy">Healthy</div>
+            </div>
+            <div class="photo-cell">
+              <div class="photo-bg" style="background:#b8c89e;">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="12" rx="2" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/><circle cx="10" cy="11" r="3" stroke="rgba(0,0,0,0.2)" stroke-width="1.3"/></svg>
+              </div>
+              <div class="tag tag-healthy">Healthy</div>
+            </div>
+            <div class="photo-cell" style="background:var(--color-background-secondary); border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+              <div style="text-align:center;">
+                <div style="font-size:9px;color:var(--color-text-secondary);">+ Add</div>
+                <div style="font-size:9px;color:var(--color-text-secondary);">photo</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4v4h4V7z" stroke="currentColor" stroke-width="1.2"/></svg><span>Home</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.2" rx="2"/></svg><span>Water</span></div>
+        <div class="ni active"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="#3B6D11" stroke-width="1.2"/></svg><span>Plants</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg><span>Profile</span></div>
+      </div>
+    </div>
+    <div class="lbl">Photo gallery tab</div>
+  </div>
+
+  <!-- Screen 2: Fullscreen photo + AI analysis -->
+  <div id="detail-screen">
+    <div class="phone">
+      <div class="sbar"><span>9:43</span><span>●●●</span></div>
+      <div class="scroll">
+        <div class="full-photo">
+          <svg width="60" height="60" viewBox="0 0 60 60" fill="none"><rect x="5" y="12" width="50" height="38" rx="5" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><circle cx="30" cy="31" r="10" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><path d="M20 12l3-6h14l3 6" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linejoin="round"/></svg>
+          <div class="full-photo-overlay"></div>
+          <div class="photo-nav-top">
+            <div class="photo-nav-btn">← Photos</div>
+            <div class="photo-nav-btn">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="white" stroke-width="1.2"/><path d="M5 7h4M7 5v4" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+          <div class="photo-date">
+            <div class="photo-date-main">19 April 2025</div>
+            <div class="photo-date-sub">Issue logged · Moderate</div>
+          </div>
+          <div class="photo-counter">1 / 6</div>
+        </div>
+
+        <div class="timeline-strip">
+          <div class="ts-label">All photos for this plant</div>
+          <div class="ts-row">
+            <div class="ts-thumb active" style="background:#c8a882;"><div class="ts-thumb-dot" style="background:#E24B4A;"></div></div>
+            <div class="ts-thumb" style="background:#a8be8a;"><div class="ts-thumb-dot" style="background:#639922;"></div></div>
+            <div class="ts-thumb" style="background:#b5c9a0;"><div class="ts-thumb-dot" style="background:#378ADD;"></div></div>
+            <div class="ts-thumb" style="background:#c5d4aa;"><div class="ts-thumb-dot" style="background:#639922;"></div></div>
+            <div class="ts-thumb" style="background:#b8c89e;"><div class="ts-thumb-dot" style="background:#639922;"></div></div>
+            <div class="ts-thumb" style="background:#cdd9b5;"><div class="ts-thumb-dot" style="background:#639922;"></div></div>
+          </div>
+        </div>
+
+        <div class="analysis-card">
+          <div class="analysis-hd">
+            <svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#A32D2D" stroke-width="1.1"/><path d="M6.5 4v3M6.5 8.5v.8" stroke="#A32D2D" stroke-width="1.1" stroke-linecap="round"/></svg>
+            <span>Powdery mildew · AI analysis</span>
+          </div>
+          <div class="analysis-body">Early-to-mid stage visible on upper leaves. Comparing to your photo from 5 Apr — coverage has increased roughly 30%. Acting now should prevent spread to new growth.</div>
+          <div class="analysis-compare">
+            <div class="compare-label">Compared to 5 Apr</div>
+            <div class="compare-row">
+              <div class="compare-thumb" style="background:#c5d4aa;"><span>5 Apr</span></div>
+              <div class="compare-thumb" style="background:#c8a882;"><span>19 Apr</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-pills">
+          <div class="pill primary">Log treatment done</div>
+          <div class="pill">View care plan</div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4v4h4V7z" stroke="currentColor" stroke-width="1.2"/></svg><span>Home</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.2" rx="2"/></svg><span>Water</span></div>
+        <div class="ni active"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="#3B6D11" stroke-width="1.2"/></svg><span>Plants</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg><span>Profile</span></div>
+      </div>
+    </div>
+    <div class="lbl">Photo detail + AI comparison</div>
+  </div>
+
+</div>
+
+<script>
+function openPhoto() {
+  document.getElementById('detail-screen').scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+}
+</script>

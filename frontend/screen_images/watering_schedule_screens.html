@@ -1,0 +1,277 @@
+
+<style>
+  * { box-sizing: border-box; }
+  .wrap { display: flex; gap: 16px; overflow-x: auto; padding: 1rem 0.5rem 1.5rem; scrollbar-width: none; align-items: flex-start; }
+  .wrap::-webkit-scrollbar { display: none; }
+  .phone { width: 210px; background: var(--color-background-primary); border-radius: 28px; border: 0.5px solid var(--color-border-secondary); overflow: hidden; flex-shrink: 0; font-family: var(--font-sans); }
+  .sbar { background: #2D4A1E; height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+  .sbar span { color: #a8c890; font-size: 10px; }
+  .scroll { max-height: 460px; overflow-y: auto; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+  .nav { display: flex; justify-content: space-around; padding: 7px 0 9px; border-top: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); }
+  .ni { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 8px; color: var(--color-text-secondary); }
+  .ni.active { color: #3B6D11; }
+  .ni svg { width: 16px; height: 16px; }
+  .lbl { text-align: center; font-size: 11px; color: var(--color-text-secondary); margin-top: 8px; }
+
+  .hero { background: #2D4A1E; padding: 12px 14px 14px; }
+  .hero-sm { font-size: 10px; color: #7fb86a; letter-spacing: 0.06em; text-transform: uppercase; }
+  .hero-title { font-size: 15px; font-weight: 500; color: #e8f0e1; margin: 2px 0 8px; }
+  .rain-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(55,138,221,0.2); border-radius: 5px; padding: 3px 8px; }
+  .rain-chip span { font-size: 10px; color: #85B7EB; }
+
+  .section-hd { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px 4px; }
+  .section-hd .title { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
+  .section-hd .link { font-size: 10px; color: #3B6D11; }
+
+  .water-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .water-item:last-child { border-bottom: none; }
+  .check-btn { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid #3B6D11; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
+  .check-btn.done { background: #3B6D11; border-color: #3B6D11; }
+  .check-btn svg { width: 14px; height: 14px; }
+  .wi-body { flex: 1; min-width: 0; }
+  .wi-name { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
+  .wi-sub { font-size: 10px; color: var(--color-text-secondary); margin-top: 1px; }
+  .wi-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+  .badge-overdue { background: #FCEBEB; color: #A32D2D; }
+  .badge-today { background: #EAF3DE; color: #27500A; }
+  .badge-skipped { background: #E6F1FB; color: #0C447C; }
+
+  .done-item .wi-name { color: var(--color-text-secondary); text-decoration: line-through; }
+  .done-item .wi-sub { color: var(--color-text-tertiary); }
+
+  .ai-skip-card { margin: 0 14px 8px; background: #E6F1FB; border-radius: 8px; padding: 8px 10px; border: 0.5px solid #B5D4F4; }
+  .ai-skip-title { font-size: 10px; font-weight: 500; color: #0C447C; margin-bottom: 2px; }
+  .ai-skip-body { font-size: 9px; color: #185FA5; line-height: 1.5; }
+
+  .upcoming-list { padding: 0 14px 12px; }
+  .up-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .up-item:last-child { border-bottom: none; }
+  .up-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .up-name { font-size: 11px; color: var(--color-text-primary); flex: 1; }
+  .up-date { font-size: 10px; color: var(--color-text-secondary); }
+  .up-adj { font-size: 9px; color: #185FA5; }
+
+  .cal-section { padding: 10px 14px 14px; }
+  .cal-month { font-size: 11px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 8px; }
+  .cal-days-hd { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+  .cal-days-hd span { font-size: 8px; color: var(--color-text-secondary); text-align: center; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-day { height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--color-text-secondary); }
+  .cal-day.has-water { background: #EAF3DE; color: #27500A; font-weight: 500; }
+  .cal-day.today { background: #2D4A1E; color: #e8f0e1; font-weight: 500; }
+  .cal-day.past-water { background: var(--color-background-secondary); color: var(--color-text-tertiary); }
+  .cal-day.done-water { background: #C0DD97; color: #27500A; }
+  .cal-day.skipped { background: #E6F1FB; color: #185FA5; }
+  .cal-day.empty { opacity: 0; }
+
+  .legend { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 14px 8px; }
+  .leg-item { display: flex; align-items: center; gap: 4px; }
+  .leg-dot { width: 8px; height: 8px; border-radius: 2px; }
+  .leg-text { font-size: 8px; color: var(--color-text-secondary); }
+
+  .plant-picker { display: flex; gap: 6px; padding: 8px 14px 0; overflow-x: auto; scrollbar-width: none; }
+  .plant-picker::-webkit-scrollbar { display: none; }
+  .pp-chip { padding: 4px 10px; border-radius: 20px; font-size: 10px; white-space: nowrap; border: 0.5px solid var(--color-border-secondary); color: var(--color-text-secondary); background: transparent; cursor: pointer; }
+  .pp-chip.active { background: #2D4A1E; color: #c8ddb8; border-color: #2D4A1E; }
+
+  .schedule-config { margin: 8px 14px 0; background: var(--color-background-secondary); border-radius: 8px; padding: 8px 10px; border: 0.5px solid var(--color-border-tertiary); }
+  .sc-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .sc-row:last-child { border-bottom: none; }
+  .sc-label { font-size: 10px; color: var(--color-text-secondary); }
+  .sc-val { font-size: 10px; font-weight: 500; color: var(--color-text-primary); }
+  .sc-adj { font-size: 9px; color: #185FA5; }
+</style>
+
+<h2 class="sr-only">Watering schedule mockup showing three screens: today's watering tasks, a per-plant calendar view, and an upcoming watering list</h2>
+
+<div class="wrap">
+
+  <div>
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span>●●●</span></div>
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-sm">Today · Wed 23 Apr</div>
+          <div class="hero-title">Watering</div>
+          <div class="rain-chip">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2C4 2 2 4 2 6.5a4 4 0 008 0C10 4 8 2 6 2z" stroke="#85B7EB" stroke-width="1" fill="none"/><path d="M4 9l1 2M6 9.5l1 2M8 9l1 2" stroke="#85B7EB" stroke-width="1" stroke-linecap="round"/></svg>
+            <span>Rain tomorrow — AI adjusted schedules</span>
+          </div>
+        </div>
+
+        <div class="ai-skip-card">
+          <div class="ai-skip-title">2 plants skipped today</div>
+          <div class="ai-skip-body">Courgette &amp; Chilli skipped — 12mm rain yesterday means soil moisture is sufficient. Next check Friday.</div>
+        </div>
+
+        <div class="section-hd">
+          <span class="title">To water today (3)</span>
+          <span class="link">Skip all</span>
+        </div>
+
+        <div class="water-item" id="wi1">
+          <button class="check-btn" onclick="markDone('wi1')" aria-label="Mark watered">
+            <svg viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4 6-6" stroke="#3B6D11" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="wi-body">
+            <div class="wi-name">Victoria Plum</div>
+            <div class="wi-sub">3 days overdue · Base: every 10d</div>
+          </div>
+          <span class="wi-badge badge-overdue">Overdue</span>
+        </div>
+
+        <div class="water-item" id="wi2">
+          <button class="check-btn" onclick="markDone('wi2')" aria-label="Mark watered">
+            <svg viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4 6-6" stroke="#3B6D11" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="wi-body">
+            <div class="wi-name">Cherry Tomato</div>
+            <div class="wi-sub">Due today · Base: every 2d</div>
+          </div>
+          <span class="wi-badge badge-today">Due</span>
+        </div>
+
+        <div class="water-item" id="wi3">
+          <button class="check-btn" onclick="markDone('wi3')" aria-label="Mark watered">
+            <svg viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4 6-6" stroke="#3B6D11" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="wi-body">
+            <div class="wi-name">Basil (pot)</div>
+            <div class="wi-sub">Due today · Pots dry faster</div>
+          </div>
+          <span class="wi-badge badge-today">Due</span>
+        </div>
+
+        <div class="section-hd" style="padding-top:8px;">
+          <span class="title">Coming up</span>
+        </div>
+        <div class="upcoming-list">
+          <div class="up-item">
+            <div class="up-dot" style="background:#639922"></div>
+            <span class="up-name">Courgette</span>
+            <span class="up-date">Fri 25</span>
+            <span class="up-adj">+2d rain</span>
+          </div>
+          <div class="up-item">
+            <div class="up-dot" style="background:#378ADD"></div>
+            <span class="up-name">Chilli Pepper</span>
+            <span class="up-date">Fri 25</span>
+            <span class="up-adj">+2d rain</span>
+          </div>
+          <div class="up-item">
+            <div class="up-dot" style="background:#EF9F27"></div>
+            <span class="up-name">Victoria Plum</span>
+            <span class="up-date">Sat 3 May</span>
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4v4h4V7z" stroke="currentColor" stroke-width="1.2"/></svg><span>Home</span></div>
+        <div class="ni active"><svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="#3B6D11" stroke-width="1.2" rx="2"/><path d="M3 7h10M7 3v10" stroke="#3B6D11" stroke-width="1.2"/></svg><span>Water</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.2"/></svg><span>Plants</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg><span>Profile</span></div>
+      </div>
+    </div>
+    <div class="lbl">Today's watering</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="sbar"><span>9:44</span><span>●●●</span></div>
+      <div class="scroll">
+        <div class="hero" style="padding-bottom:10px;">
+          <div class="hero-sm">Schedule</div>
+          <div class="hero-title">Per plant view</div>
+        </div>
+
+        <div class="plant-picker">
+          <div class="pp-chip active">Victoria Plum</div>
+          <div class="pp-chip">Cherry Tom.</div>
+          <div class="pp-chip">Basil</div>
+          <div class="pp-chip">Courgette</div>
+        </div>
+
+        <div class="schedule-config">
+          <div class="sc-row">
+            <span class="sc-label">Base interval</span>
+            <span class="sc-val">Every 10 days</span>
+          </div>
+          <div class="sc-row">
+            <span class="sc-label">Weather adjusted</span>
+            <span class="sc-val sc-adj">+2d if rain &gt;8mm</span>
+          </div>
+          <div class="sc-row">
+            <span class="sc-label">Hot days (&gt;28°C)</span>
+            <span class="sc-val sc-adj">-3d interval</span>
+          </div>
+          <div class="sc-row">
+            <span class="sc-label">Skip threshold</span>
+            <span class="sc-val">10mm+ rain</span>
+          </div>
+          <div class="sc-row">
+            <span class="sc-label">Soil type</span>
+            <span class="sc-val">Clay (slow drain)</span>
+          </div>
+        </div>
+
+        <div class="cal-section">
+          <div class="cal-month">April 2025</div>
+          <div class="cal-days-hd">
+            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-day empty"></div><div class="cal-day">1</div><div class="cal-day">2</div><div class="cal-day done-water">3</div><div class="cal-day">4</div><div class="cal-day">5</div><div class="cal-day">6</div>
+            <div class="cal-day">7</div><div class="cal-day">8</div><div class="cal-day">9</div><div class="cal-day">10</div><div class="cal-day">11</div><div class="cal-day">12</div><div class="cal-day">13</div>
+            <div class="cal-day done-water">14</div><div class="cal-day">15</div><div class="cal-day">16</div><div class="cal-day">17</div><div class="cal-day">18</div><div class="cal-day">19</div><div class="cal-day">20</div>
+            <div class="cal-day skipped">21</div><div class="cal-day">22</div><div class="cal-day today">23</div><div class="cal-day">24</div><div class="cal-day">25</div><div class="cal-day">26</div><div class="cal-day">27</div>
+            <div class="cal-day">28</div><div class="cal-day has-water">29</div><div class="cal-day">30</div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div>
+          </div>
+        </div>
+
+        <div class="legend">
+          <div class="leg-item"><div class="leg-dot" style="background:#C0DD97"></div><span class="leg-text">Watered</span></div>
+          <div class="leg-item"><div class="leg-dot" style="background:#EAF3DE"></div><span class="leg-text">Scheduled</span></div>
+          <div class="leg-item"><div class="leg-dot" style="background:#E6F1FB"></div><span class="leg-text">Skipped (rain)</span></div>
+          <div class="leg-item"><div class="leg-dot" style="background:#2D4A1E"></div><span class="leg-text">Today</span></div>
+        </div>
+
+        <div style="margin:0 14px 14px;padding:8px 10px;background:var(--color-background-secondary);border-radius:8px;border:0.5px solid var(--color-border-tertiary);">
+          <div style="font-size:10px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px;">Watering history</div>
+          <div style="font-size:9px;color:var(--color-text-secondary);line-height:1.6;">
+            Apr 21 — Skipped (13mm rain)<br>
+            Apr 14 — Watered · 15L<br>
+            Apr 3 — Watered · 12L
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4v4h4V7z" stroke="currentColor" stroke-width="1.2"/></svg><span>Home</span></div>
+        <div class="ni active"><svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="#3B6D11" stroke-width="1.2" rx="2"/><path d="M3 7h10M7 3v10" stroke="#3B6D11" stroke-width="1.2"/></svg><span>Water</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.2"/></svg><span>Plants</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg><span>Profile</span></div>
+      </div>
+    </div>
+    <div class="lbl">Per-plant calendar</div>
+  </div>
+
+</div>
+
+<script>
+function markDone(id) {
+  const item = document.getElementById(id);
+  if (!item) return;
+  const btn = item.querySelector('.check-btn');
+  const badge = item.querySelector('.wi-badge');
+  btn.classList.toggle('done');
+  if (btn.classList.contains('done')) {
+    btn.style.background = '#3B6D11';
+    item.classList.add('done-item');
+    if (badge) { badge.textContent = 'Watered'; badge.className = 'wi-badge badge-skipped'; }
+  } else {
+    btn.style.background = '';
+    item.classList.remove('done-item');
+    if (badge) { badge.textContent = id === 'wi1' ? 'Overdue' : 'Due'; badge.className = 'wi-badge ' + (id === 'wi1' ? 'badge-overdue' : 'badge-today'); }
+  }
+}
+</script>

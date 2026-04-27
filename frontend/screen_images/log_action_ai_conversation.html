@@ -1,0 +1,169 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.bg { background: rgba(0,0,0,0.35); min-height: 700px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: var(--border-radius-lg); overflow: hidden; }
+.sheet { background: var(--color-background-primary); border-radius: 20px 20px 0 0; border-top: 0.5px solid var(--color-border-secondary); padding-bottom: 16px; }
+.handle { width: 36px; height: 4px; background: var(--color-border-secondary); border-radius: 2px; margin: 12px auto 0; }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.plant-ctx { display: flex; align-items: center; gap: 8px; }
+.plant-icon { width: 30px; height: 30px; border-radius: 8px; background: #EAF3DE; display: flex; align-items: center; justify-content: center; }
+.plant-icon svg { width: 15px; height: 15px; }
+.plant-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.plant-sub { font-size: 11px; color: var(--color-text-secondary); }
+.logged-badge { display: flex; align-items: center; gap: 4px; background: #EAF3DE; border-radius: 5px; padding: 3px 8px; }
+.logged-badge svg { width: 12px; height: 12px; }
+.logged-badge span { font-size: 11px; color: #27500A; font-weight: 500; }
+
+.chat-area { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; scrollbar-width: none; }
+.chat-area::-webkit-scrollbar { display: none; }
+
+.msg-row { display: flex; gap: 8px; align-items: flex-end; }
+.msg-row.user { flex-direction: row-reverse; }
+.avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.avatar.ai { background: #2D4A1E; }
+.avatar.ai svg { width: 14px; height: 14px; }
+.avatar.user { background: #E6F1FB; font-size: 11px; font-weight: 500; color: #0C447C; }
+
+.bubble { max-width: 240px; border-radius: 14px; padding: 9px 12px; font-size: 12px; line-height: 1.5; }
+.bubble.ai { background: var(--color-background-secondary); color: var(--color-text-primary); border-radius: 14px 14px 14px 4px; border: 0.5px solid var(--color-border-tertiary); }
+.bubble.user { background: #2D4A1E; color: #e8f0e1; border-radius: 14px 14px 4px 14px; }
+.bubble.ai .sender { font-size: 10px; font-weight: 500; color: #3B6D11; margin-bottom: 4px; }
+
+.action-log-bubble { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; max-width: 240px; }
+.log-icon { width: 28px; height: 28px; border-radius: 7px; background: #FCEBEB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.log-icon svg { width: 14px; height: 14px; }
+.log-title { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
+.log-sub { font-size: 10px; color: var(--color-text-secondary); margin-top: 1px; }
+
+.photo-bubble { border-radius: 14px 14px 4px 14px; overflow: hidden; max-width: 160px; border: 0.5px solid var(--color-border-tertiary); }
+.photo-placeholder { background: #d4c9b8; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.photo-placeholder svg { width: 22px; height: 22px; opacity: 0.5; }
+.photo-placeholder span { font-size: 10px; color: rgba(0,0,0,0.4); }
+.photo-caption { background: #2D4A1E; padding: 5px 10px; font-size: 11px; color: #c8ddb8; }
+
+.diagnosis-bubble { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 14px 14px 14px 4px; max-width: 260px; overflow: hidden; }
+.diag-header { background: #FCEBEB; padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 0.5px solid #F7C1C1; }
+.diag-header svg { width: 14px; height: 14px; flex-shrink: 0; }
+.diag-header span { font-size: 11px; font-weight: 500; color: #A32D2D; }
+.diag-body { padding: 8px 12px; font-size: 12px; color: var(--color-text-primary); line-height: 1.5; }
+.diag-actions { padding: 0 12px 10px; display: flex; flex-direction: column; gap: 5px; }
+.diag-action-btn { background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: 7px; padding: 7px 10px; font-size: 11px; color: var(--color-text-primary); font-family: var(--font-sans); cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; }
+.diag-action-btn span { color: var(--color-text-secondary); }
+
+.typing { display: flex; align-items: center; gap: 4px; padding: 9px 12px; background: var(--color-background-secondary); border-radius: 14px 14px 14px 4px; border: 0.5px solid var(--color-border-tertiary); width: fit-content; }
+.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-tertiary); animation: blink 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+.input-row { padding: 10px 16px 0; display: flex; gap: 8px; align-items: flex-end; border-top: 0.5px solid var(--color-border-tertiary); margin-top: 4px; }
+.reply-input { flex: 1; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-secondary); border-radius: 20px; padding: 8px 14px; font-size: 13px; color: var(--color-text-primary); font-family: var(--font-sans); resize: none; line-height: 1.4; min-height: 36px; }
+.cam-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.cam-btn svg { width: 16px; height: 16px; }
+.send-btn { width: 36px; height: 36px; border-radius: 50%; background: #2D4A1E; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.send-btn svg { width: 14px; height: 14px; }
+</style>
+
+<h2 class="sr-only">Log action sheet showing an AI-driven conversation after logging a plant disease issue, including photo upload and diagnosis</h2>
+
+<div class="bg">
+  <div class="sheet">
+    <div class="handle"></div>
+
+    <div class="sheet-header">
+      <div class="plant-ctx">
+        <div class="plant-icon">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 14V6M8 6C8 4 6 2 3 2c0 3 2 5 5 6zM8 6c0-2 2-4 5-4 0 3-2 5-5 6z" stroke="#3B6D11" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="plant-name">Courgette</div>
+          <div class="plant-sub">Raised bed B · Wed 23 Apr</div>
+        </div>
+      </div>
+      <div class="logged-badge">
+        <svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#27500A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Issue logged</span>
+      </div>
+    </div>
+
+    <div class="chat-area" id="chat">
+
+      <div class="msg-row">
+        <div style="width:26px;flex-shrink:0;"></div>
+        <div class="action-log-bubble">
+          <div class="log-icon">
+            <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#A32D2D" stroke-width="1.2"/><path d="M7 4.5v3M7 9v1" stroke="#A32D2D" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </div>
+          <div>
+            <div class="log-title">Issue found</div>
+            <div class="log-sub">Moderate · no photo yet</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg-row">
+        <div class="avatar ai">
+          <svg viewBox="0 0 14 14" fill="none"><path d="M7 2C4.8 2 3 4 3 7s1.8 5 4 5 4-2 4-5-1.8-5-4-5z" stroke="#7fb86a" stroke-width="1.1"/><path d="M5 7c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" fill="#7fb86a"/></svg>
+        </div>
+        <div class="bubble ai">
+          <div class="sender">Garden AI</div>
+          Can you describe where you're seeing it — upper or lower leaves? And is it white and powdery, or more yellow and wet-looking?
+        </div>
+      </div>
+
+      <div class="msg-row user">
+        <div class="avatar user">A</div>
+        <div class="bubble user">White powdery stuff, mostly on the upper leaves of the older growth</div>
+      </div>
+
+      <div class="msg-row">
+        <div class="avatar ai">
+          <svg viewBox="0 0 14 14" fill="none"><path d="M7 2C4.8 2 3 4 3 7s1.8 5 4 5 4-2 4-5-1.8-5-4-5z" stroke="#7fb86a" stroke-width="1.1"/><path d="M5 7c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" fill="#7fb86a"/></svg>
+        </div>
+        <div class="bubble ai">
+          <div class="sender">Garden AI</div>
+          That sounds like powdery mildew. Can you send a photo? It'll help me confirm and check how far it's spread.
+        </div>
+      </div>
+
+      <div class="msg-row user">
+        <div class="avatar user">A</div>
+        <div class="photo-bubble">
+          <div class="photo-placeholder">
+            <svg viewBox="0 0 22 22" fill="none"><rect x="2" y="5" width="18" height="14" rx="2" stroke="rgba(0,0,0,0.4)" stroke-width="1.3"/><circle cx="11" cy="12" r="3.5" stroke="rgba(0,0,0,0.4)" stroke-width="1.3"/><path d="M7 5l1.5-2h5L15 5" stroke="rgba(0,0,0,0.4)" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span>leaf_photo.jpg</span>
+          </div>
+          <div class="photo-caption">Upper leaves, 3 plants affected</div>
+        </div>
+      </div>
+
+      <div class="msg-row">
+        <div class="avatar ai">
+          <svg viewBox="0 0 14 14" fill="none"><path d="M7 2C4.8 2 3 4 3 7s1.8 5 4 5 4-2 4-5-1.8-5-4-5z" stroke="#7fb86a" stroke-width="1.1"/><path d="M5 7c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" fill="#7fb86a"/></svg>
+        </div>
+        <div class="diagnosis-bubble">
+          <div class="diag-header">
+            <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#A32D2D" stroke-width="1.2"/><path d="M7 4.5v3M7 9v1" stroke="#A32D2D" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span>Powdery mildew confirmed</span>
+          </div>
+          <div class="diag-body">Early-to-mid stage. 3 plants affected but it hasn't reached new growth yet — good time to act. I've updated the issue log with the photo.</div>
+          <div class="diag-actions">
+            <button class="diag-action-btn">Add treatment to schedule <span>↗</span></button>
+            <button class="diag-action-btn">View care instructions <span>↗</span></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="input-row">
+      <div class="cam-btn">
+        <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="4" width="13" height="10" rx="2" stroke="var(--color-text-secondary)" stroke-width="1.2"/><circle cx="8" cy="9" r="2.5" stroke="var(--color-text-secondary)" stroke-width="1.2"/><path d="M5.5 4l1-2h3l1 2" stroke="var(--color-text-secondary)" stroke-width="1.2" stroke-linejoin="round"/></svg>
+      </div>
+      <textarea class="reply-input" rows="1" placeholder="Reply or add another photo..."></textarea>
+      <button class="send-btn">
+        <svg viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="#c8ddb8" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+</div>

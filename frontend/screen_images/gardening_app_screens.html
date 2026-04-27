@@ -1,0 +1,347 @@
+
+<style>
+  .phone { width: 200px; background: var(--color-background-primary); border-radius: 28px; border: 0.5px solid var(--color-border-secondary); overflow: hidden; flex-shrink: 0; font-family: var(--font-sans); }
+  .status-bar { background: #2D4A1E; height: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+  .status-text { color: #a8c890; font-size: 10px; }
+  .screen-scroll { height: 420px; overflow-y: auto; scrollbar-width: none; }
+  .screen-scroll::-webkit-scrollbar { display: none; }
+  .hero { background: #2D4A1E; padding: 12px 14px 16px; }
+  .hero-label { font-size: 10px; color: #7fb86a; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .hero-title { font-size: 16px; font-weight: 500; color: #e8f0e1; margin-bottom: 8px; }
+  .ai-card { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px; border: 0.5px solid rgba(255,255,255,0.12); }
+  .ai-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(163,210,120,0.2); border-radius: 4px; padding: 2px 6px; margin-bottom: 6px; }
+  .ai-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: #7fb86a; }
+  .ai-badge-text { font-size: 9px; color: #7fb86a; }
+  .ai-text { font-size: 11px; color: #c8ddb8; line-height: 1.5; }
+  .weather-row { display: flex; gap: 6px; margin-top: 8px; }
+  .weather-chip { background: rgba(255,255,255,0.06); border-radius: 6px; padding: 4px 8px; font-size: 10px; color: #a8c890; border: 0.5px solid rgba(255,255,255,0.08); }
+  .section-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 6px; }
+  .section-title { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
+  .section-link { font-size: 10px; color: #3B6D11; }
+  .plant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 14px 14px; }
+  .plant-card { background: var(--color-background-secondary); border-radius: 10px; padding: 10px; border: 0.5px solid var(--color-border-tertiary); cursor: pointer; }
+  .plant-emoji { font-size: 22px; margin-bottom: 6px; display: block; }
+  .plant-name { font-size: 11px; font-weight: 500; color: var(--color-text-primary); }
+  .plant-type { font-size: 10px; color: var(--color-text-secondary); margin-top: 1px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .status-row { display: flex; align-items: center; margin-top: 6px; }
+  .status-text-small { font-size: 9px; color: var(--color-text-secondary); }
+  .alert-card { margin: 0 14px 8px; background: #FFF8E7; border-radius: 8px; padding: 8px 10px; border: 0.5px solid #FAC775; display: flex; gap: 8px; align-items: flex-start; }
+  .alert-icon { font-size: 14px; margin-top: 1px; }
+  .alert-title { font-size: 10px; font-weight: 500; color: #633806; }
+  .alert-body { font-size: 9px; color: #854F0B; margin-top: 1px; line-height: 1.4; }
+  .detail-hero { background: #2D4A1E; padding: 14px 14px 20px; position: relative; }
+  .back-btn { font-size: 10px; color: #a8c890; margin-bottom: 8px; display: flex; align-items: center; gap: 3px; }
+  .detail-emoji { font-size: 32px; margin-bottom: 8px; display: block; }
+  .detail-name { font-size: 17px; font-weight: 500; color: #e8f0e1; }
+  .detail-sub { font-size: 11px; color: #7fb86a; margin-top: 2px; }
+  .detail-chips { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+  .chip { padding: 3px 8px; border-radius: 4px; font-size: 9px; border: 0.5px solid; }
+  .chip-green { background: rgba(97,180,84,0.15); color: #7fb86a; border-color: rgba(97,180,84,0.3); }
+  .chip-amber { background: rgba(250,199,117,0.15); color: #BA7517; border-color: rgba(250,199,117,0.3); }
+  .chip-blue { background: rgba(55,138,221,0.12); color: #185FA5; border-color: rgba(55,138,221,0.25); }
+  .timeline { padding: 0 14px 12px; }
+  .tl-item { display: flex; gap: 10px; margin-bottom: 10px; }
+  .tl-line-col { display: flex; flex-direction: column; align-items: center; }
+  .tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+  .tl-connector { width: 1px; flex: 1; background: var(--color-border-tertiary); margin-top: 3px; }
+  .tl-content { flex: 1; padding-bottom: 6px; }
+  .tl-date { font-size: 9px; color: var(--color-text-secondary); margin-bottom: 2px; }
+  .tl-title { font-size: 11px; font-weight: 500; color: var(--color-text-primary); }
+  .tl-body { font-size: 10px; color: var(--color-text-secondary); margin-top: 2px; line-height: 1.4; }
+  .tl-tag { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 8px; margin-top: 3px; }
+  .ai-insight { margin: 0 14px 10px; background: #EAF3DE; border-radius: 8px; padding: 8px 10px; border: 0.5px solid #C0DD97; }
+  .ai-insight-label { font-size: 9px; color: #3B6D11; font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+  .ai-insight-text { font-size: 10px; color: #27500A; line-height: 1.5; }
+  .add-instruction-screen { padding: 0 14px 14px; }
+  .sheet-handle { width: 32px; height: 3px; background: var(--color-border-secondary); border-radius: 2px; margin: 10px auto 14px; }
+  .form-label { font-size: 10px; color: var(--color-text-secondary); margin-bottom: 4px; font-weight: 500; }
+  .form-input { width: 100%; box-sizing: border-box; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-secondary); border-radius: 6px; padding: 7px 9px; font-size: 11px; color: var(--color-text-primary); font-family: var(--font-sans); }
+  .form-group { margin-bottom: 10px; }
+  .source-row { display: flex; gap: 5px; }
+  .source-tag { padding: 4px 8px; border-radius: 5px; font-size: 9px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); }
+  .source-tag.active { background: #EAF3DE; border-color: #97C459; color: #3B6D11; }
+  .submit-btn { width: 100%; background: #2D4A1E; color: #c8ddb8; border: none; border-radius: 8px; padding: 10px; font-size: 12px; font-weight: 500; font-family: var(--font-sans); margin-top: 6px; cursor: pointer; box-sizing: border-box; }
+  .ai-review-note { background: #EAF3DE; border-radius: 6px; padding: 6px 8px; margin-bottom: 10px; font-size: 9px; color: #3B6D11; border: 0.5px solid #C0DD97; line-height: 1.5; }
+  .screens-wrap { display: flex; gap: 16px; overflow-x: auto; padding: 1rem 0.5rem 1.5rem; scrollbar-width: none; align-items: flex-start; }
+  .screens-wrap::-webkit-scrollbar { display: none; }
+  .screen-label { text-align: center; font-size: 11px; color: var(--color-text-secondary); margin-top: 8px; }
+  .nav-bar { display: flex; justify-content: space-around; padding: 8px 0 10px; border-top: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 8px; color: var(--color-text-secondary); }
+  .nav-item.active { color: #3B6D11; }
+  .nav-icon { width: 16px; height: 16px; }
+</style>
+
+<h2 class="sr-only">Flutter gardening app mockup showing three screens: home dashboard, plant detail view, and add care instruction form</h2>
+
+<div class="screens-wrap">
+
+  <div>
+    <div class="phone">
+      <div class="status-bar">
+        <span class="status-text">9:41</span>
+        <span class="status-text">●●●</span>
+      </div>
+      <div class="screen-scroll">
+        <div class="hero">
+          <div class="hero-label">Your garden</div>
+          <div class="hero-title">Good morning, Alex</div>
+          <div class="ai-card">
+            <div class="ai-badge"><div class="ai-badge-dot"></div><span class="ai-badge-text">AI summary</span></div>
+            <div class="ai-text">Rain expected tomorrow — hold off watering your tomatoes. Your basil is due for pruning; pinching the flower buds now will extend the harvest by weeks.</div>
+            <div class="weather-row">
+              <div class="weather-chip">18°C today</div>
+              <div class="weather-chip">Rain tomorrow</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-card">
+          <div class="alert-icon">⚠</div>
+          <div>
+            <div class="alert-title">Powdery mildew — Courgette</div>
+            <div class="alert-body">Logged 4 days ago. Apply diluted neem oil, improve airflow. AI watching for recurrence.</div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <span class="section-title">Plants (8)</span>
+          <span class="section-link">+ Add</span>
+        </div>
+
+        <div class="plant-grid">
+          <div class="plant-card">
+            <span class="plant-emoji">🍅</span>
+            <div class="plant-name">Cherry Tomato</div>
+            <div class="plant-type">Solanum lycopersicum</div>
+            <div class="status-row">
+              <span class="status-dot" style="background:#639922"></span>
+              <span class="status-text-small">Thriving</span>
+            </div>
+          </div>
+          <div class="plant-card">
+            <span class="plant-emoji">🌿</span>
+            <div class="plant-name">Basil</div>
+            <div class="plant-type">Ocimum basilicum</div>
+            <div class="status-row">
+              <span class="status-dot" style="background:#EF9F27"></span>
+              <span class="status-text-small">Needs pruning</span>
+            </div>
+          </div>
+          <div class="plant-card">
+            <span class="plant-emoji">🥒</span>
+            <div class="plant-name">Courgette</div>
+            <div class="plant-type">Cucurbita pepo</div>
+            <div class="status-row">
+              <span class="status-dot" style="background:#E24B4A"></span>
+              <span class="status-text-small">Mildew alert</span>
+            </div>
+          </div>
+          <div class="plant-card">
+            <span class="plant-emoji">🌶</span>
+            <div class="plant-name">Chilli Pepper</div>
+            <div class="plant-type">Capsicum annuum</div>
+            <div class="status-row">
+              <span class="status-dot" style="background:#639922"></span>
+              <span class="status-text-small">Healthy</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item active">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4v4h4V7z" stroke="#3B6D11" stroke-width="1.2" fill="none"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M8 5v3l2 1" stroke="currentColor" stroke-width="1.2"/></svg>
+          <span>History</span>
+        </div>
+        <div class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2zM8 6v4M8 11v1" stroke="currentColor" stroke-width="1.2"/></svg>
+          <span>Library</span>
+        </div>
+        <div class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg>
+          <span>Profile</span>
+        </div>
+      </div>
+    </div>
+    <div class="screen-label">Home / Dashboard</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="status-bar">
+        <span class="status-text">9:43</span>
+        <span class="status-text">●●●</span>
+      </div>
+      <div class="screen-scroll">
+        <div class="detail-hero">
+          <div class="back-btn">← Garden</div>
+          <span class="detail-emoji">🍅</span>
+          <div class="detail-name">Cherry Tomato</div>
+          <div class="detail-sub">Planted 14 Mar 2025 · Raised bed A</div>
+          <div class="detail-chips">
+            <div class="chip chip-green">Thriving</div>
+            <div class="chip chip-amber">Water in 2 days</div>
+            <div class="chip chip-blue">Full sun</div>
+          </div>
+        </div>
+
+        <div class="ai-insight">
+          <div class="ai-insight-label">
+            <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4.5" fill="none" stroke="#3B6D11"/><path d="M5 3v3M5 7.5v.5" stroke="#3B6D11" stroke-width="1"/></svg>
+            AI personalised insight
+          </div>
+          <div class="ai-insight-text">Based on last season's history, your tomatoes underperformed in July heat. Consider shade cloth above 30°C — forecast shows warm spell in 10 days.</div>
+        </div>
+
+        <div class="section-header">
+          <span class="section-title">Care history</span>
+          <span class="section-link">+ Log action</span>
+        </div>
+
+        <div class="timeline">
+          <div class="tl-item">
+            <div class="tl-line-col">
+              <div class="tl-dot" style="background:#639922"></div>
+              <div class="tl-connector"></div>
+            </div>
+            <div class="tl-content">
+              <div class="tl-date">Today · AI suggested</div>
+              <div class="tl-title">Watering due tomorrow</div>
+              <div class="tl-body">Skipped today — rain forecast. Soil moisture good.</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-line-col">
+              <div class="tl-dot" style="background:#EF9F27"></div>
+              <div class="tl-connector"></div>
+            </div>
+            <div class="tl-content">
+              <div class="tl-date">3 days ago · User logged</div>
+              <div class="tl-title">Side shoot pruned</div>
+              <div class="tl-body">Removed 4 lateral shoots. Plant looking vigorous.</div>
+              <div class="tl-tag" style="background:#EAF3DE;color:#3B6D11;font-size:8px;">pruning</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-line-col">
+              <div class="tl-dot" style="background:#378ADD"></div>
+              <div class="tl-connector"></div>
+            </div>
+            <div class="tl-content">
+              <div class="tl-date">1 week ago · User logged</div>
+              <div class="tl-title">Fertilised</div>
+              <div class="tl-body">Tomato feed applied at half strength. First flowers forming.</div>
+              <div class="tl-tag" style="background:#E6F1FB;color:#185FA5;font-size:8px;">feeding</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-line-col">
+              <div class="tl-dot" style="background:#E24B4A"></div>
+            </div>
+            <div class="tl-content">
+              <div class="tl-date">2 weeks ago · User logged</div>
+              <div class="tl-title">Blossom end rot spotted</div>
+              <div class="tl-body">2 fruits affected. Increased calcium; consistent watering schedule set.</div>
+              <div class="tl-tag" style="background:#FCEBEB;color:#A32D2D;font-size:8px;">issue</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header" style="padding-top:4px;">
+          <span class="section-title">Care instructions</span>
+          <span class="section-link">+ Add yours</span>
+        </div>
+        <div style="padding: 0 14px 14px;">
+          <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;border:0.5px solid var(--color-border-tertiary);margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:500;color:var(--color-text-primary);">Pinch out tips at 1m</span>
+              <span style="font-size:9px;color:var(--color-text-secondary);">AI verified</span>
+            </div>
+            <div style="font-size:10px;color:var(--color-text-secondary);line-height:1.4;">Stop vertical growth to direct energy into fruit set. Do this before first truss flowers.</div>
+            <div style="font-size:9px;color:var(--color-text-secondary);margin-top:4px;">Source: RHS · Added by you</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4v4h4V7z" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item active">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="#3B6D11" stroke-width="1.2"/><path d="M8 5v3l2 1" stroke="#3B6D11" stroke-width="1.2"/></svg>
+          <span>History</span>
+        </div>
+        <div class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2z" stroke="currentColor" stroke-width="1.2"/></svg>
+          <span>Library</span>
+        </div>
+        <div class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg>
+          <span>Profile</span>
+        </div>
+      </div>
+    </div>
+    <div class="screen-label">Plant detail + history</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="status-bar">
+        <span class="status-text">9:45</span>
+        <span class="status-text">●●●</span>
+      </div>
+      <div class="screen-scroll" style="background:var(--color-background-primary);">
+        <div class="add-instruction-screen">
+          <div class="sheet-handle"></div>
+          <div style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:12px;">Add care instruction</div>
+
+          <div class="ai-review-note">
+            Your instruction will be reviewed by the AI agent and cross-referenced against your plant's history and current conditions before being added.
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Instruction title</div>
+            <input class="form-input" type="text" placeholder="e.g. Pinch out tips at 1m" readonly>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Details</div>
+            <textarea class="form-input" rows="3" placeholder="Describe when and how to apply this..." style="resize:none;line-height:1.4;" readonly></textarea>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Source</div>
+            <div class="source-row">
+              <div class="source-tag active">RHS</div>
+              <div class="source-tag">Forum</div>
+              <div class="source-tag">Book</div>
+              <div class="source-tag">Other</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Source URL (optional)</div>
+            <input class="form-input" type="text" placeholder="https://rhs.org.uk/..." readonly>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Applies to</div>
+            <div class="source-row" style="flex-wrap:wrap;gap:5px;">
+              <div class="source-tag active">Cherry Tomato</div>
+              <div class="source-tag">All tomatoes</div>
+              <div class="source-tag">Entire garden</div>
+            </div>
+          </div>
+
+          <button class="submit-btn">Submit for AI review ↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="screen-label">Add care instruction</div>
+  </div>
+
+</div>
