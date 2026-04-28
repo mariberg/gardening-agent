@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB tables for the Gardening Agent'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name (dev or prod)
+  
+  ProjectName:
+    Type: String
+    Default: gardening-agent
+    Description: Name of the project, used as a prefix for resource names
+
+Resources:
+  # User Data Table
+  UserDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: plant_database_users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Plant Data Table
+  PlantDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: garden_plants
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: plant_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: plant_id
+          KeyType: HASH
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+Outputs:
+  UserTableName:
+    Description: Name of the user data DynamoDB table
+    Value: !Ref UserDataTable
+  
+  UserTableArn:
+    Description: ARN of the user data DynamoDB table
+    Value: !GetAtt UserDataTable.Arn
+  
+  PlantTableName:
+    Description: Name of the plant data DynamoDB table
+    Value: !Ref PlantDataTable
+  
+  PlantTableArn:
+    Description: ARN of the plant data DynamoDB table
+    Value: !GetAtt PlantDataTable.Arn

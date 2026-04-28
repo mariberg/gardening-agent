@@ -1,0 +1,6 @@
+{
+  "Parameters": {
+    "Environment": "prod",
+    "ProjectName": "gardening-agent"
+  }
+}
