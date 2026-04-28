@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:garden_app/data/mock/mock_action_log_repository.dart';
 import 'package:garden_app/data/mock/mock_care_instruction_repository.dart';
+import 'package:garden_app/data/mock/mock_dashboard_repository.dart';
 import 'package:garden_app/data/mock/mock_photo_repository.dart';
 import 'package:garden_app/data/mock/mock_plant_repository.dart';
 import 'package:garden_app/data/repository_provider.dart';
-import 'package:garden_app/screens/garden_list/garden_list_screen.dart';
+import 'package:garden_app/screens/home/app_shell.dart';
 import 'package:garden_app/screens/photo_detail/photo_detail_view.dart';
 import 'package:garden_app/screens/plant_detail/plant_detail_screen.dart';
 import 'package:garden_app/theme/app_colors.dart';
@@ -23,11 +24,12 @@ class GardenApp extends StatelessWidget {
       actionLogRepository: MockActionLogRepository(),
       careInstructionRepository: MockCareInstructionRepository(),
       photoRepository: MockPhotoRepository(),
+      dashboardRepository: MockDashboardRepository(),
       child: MaterialApp(
         title: 'Garden App',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const GardenListScreen(),
+        home: const AppShell(),
         onGenerateRoute: _onGenerateRoute,
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../repositories/action_log_repository.dart';
 import '../repositories/care_instruction_repository.dart';
 import '../repositories/photo_repository.dart';
+import '../repositories/dashboard_repository.dart';
 import '../repositories/plant_repository.dart';
 
 /// An [InheritedWidget] that holds all repository instances and makes them
@@ -15,6 +16,7 @@ class RepositoryProvider extends InheritedWidget {
   final ActionLogRepository actionLogRepository;
   final CareInstructionRepository careInstructionRepository;
   final PhotoRepository photoRepository;
+  final DashboardRepository dashboardRepository;
 
   const RepositoryProvider({
     super.key,
@@ -22,6 +24,7 @@ class RepositoryProvider extends InheritedWidget {
     required this.actionLogRepository,
     required this.careInstructionRepository,
     required this.photoRepository,
+    required this.dashboardRepository,
     required super.child,
   });
 
@@ -43,6 +46,7 @@ class RepositoryProvider extends InheritedWidget {
       return provider!.careInstructionRepository as T;
     }
     if (T == PhotoRepository) return provider!.photoRepository as T;
+    if (T == DashboardRepository) return provider!.dashboardRepository as T;
 
     throw ArgumentError('Unknown repository type: $T');
   }
@@ -52,5 +56,6 @@ class RepositoryProvider extends InheritedWidget {
       plantRepository != oldWidget.plantRepository ||
       actionLogRepository != oldWidget.actionLogRepository ||
       careInstructionRepository != oldWidget.careInstructionRepository ||
-      photoRepository != oldWidget.photoRepository;
+      photoRepository != oldWidget.photoRepository ||
+      dashboardRepository != oldWidget.dashboardRepository;
 }

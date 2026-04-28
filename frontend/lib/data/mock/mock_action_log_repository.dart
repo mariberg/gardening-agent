@@ -295,4 +295,13 @@ class MockActionLogRepository implements ActionLogRepository {
   }) async {
     return getLogsForPlant(instanceId, limit: limit, offset: 0);
   }
+
+  @override
+  Future<List<ActionLogEntry>> getUnresolvedIssues() async {
+    final issues = _logs
+        .where((log) => log.actionType == ActionType.issueFound)
+        .toList()
+      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    return issues;
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:garden_app/data/mock/mock_action_log_repository.dart';
 import 'package:garden_app/data/mock/mock_care_instruction_repository.dart';
+import 'package:garden_app/data/mock/mock_dashboard_repository.dart';
 import 'package:garden_app/data/mock/mock_photo_repository.dart';
 import 'package:garden_app/data/mock/mock_plant_repository.dart';
 import 'package:garden_app/data/repository_provider.dart';
@@ -33,6 +34,7 @@ void main() {
       actionLogRepository: MockActionLogRepository(),
       careInstructionRepository: MockCareInstructionRepository(),
       photoRepository: MockPhotoRepository(),
+      dashboardRepository: MockDashboardRepository(),
       child: MaterialApp(
         home: Scaffold(
           body: Builder(
