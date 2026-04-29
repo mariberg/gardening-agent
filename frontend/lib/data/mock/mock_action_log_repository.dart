@@ -304,4 +304,16 @@ class MockActionLogRepository implements ActionLogRepository {
       ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
     return issues;
   }
+
+  @override
+  Future<List<ActionLogEntry>> getTodaysWateringLogs() async {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return _logs
+        .where((log) =>
+            log.actionType == ActionType.watered &&
+            (log.occurredAt.isAtSameMomentAs(todayStart) ||
+                log.occurredAt.isAfter(todayStart)))
+        .toList();
+  }
 }

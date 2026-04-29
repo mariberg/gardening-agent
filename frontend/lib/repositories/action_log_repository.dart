@@ -5,4 +5,5 @@ abstract class ActionLogRepository {
   Future<ActionLogEntry> createLog(ActionLogEntry entry);
   Future<List<ActionLogEntry>> getRecentLogs(String instanceId, {int limit = 5});
   Future<List<ActionLogEntry>> getUnresolvedIssues();
+  Future<List<ActionLogEntry>> getTodaysWateringLogs();
 }

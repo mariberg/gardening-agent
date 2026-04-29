@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../watering/watering_screen.dart';
 import 'dashboard_screen.dart';
 import 'placeholder_screen.dart';
 
@@ -16,7 +17,7 @@ class _AppShellState extends State<AppShell> {
 
   static const _screens = <Widget>[
     DashboardScreen(),
-    PlaceholderScreen(tabName: 'Water'),
+    WateringScreen(),
     PlaceholderScreen(tabName: 'Plants'),
     PlaceholderScreen(tabName: 'Profile'),
   ];

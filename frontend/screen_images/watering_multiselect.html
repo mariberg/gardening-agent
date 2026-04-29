@@ -1,0 +1,273 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.wrap { display: flex; gap: 16px; overflow-x: auto; padding: 1rem 0.5rem 1.5rem; scrollbar-width: none; align-items: flex-start; }
+.wrap::-webkit-scrollbar { display: none; }
+.phone { width: 210px; background: var(--color-background-primary); border-radius: 28px; border: 0.5px solid var(--color-border-secondary); overflow: hidden; flex-shrink: 0; font-family: var(--font-sans); }
+.sbar { background: #2D4A1E; height: 26px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+.sbar span { color: #a8c890; font-size: 10px; }
+.scroll { max-height: 500px; overflow-y: auto; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+.lbl { text-align: center; font-size: 11px; color: var(--color-text-secondary); margin-top: 8px; }
+.nav { display: flex; justify-content: space-around; padding: 7px 0 9px; border-top: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); }
+.ni { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 8px; color: var(--color-text-secondary); }
+.ni.active { color: #3B6D11; }
+.ni svg { width: 16px; height: 16px; }
+
+.hero { background: #2D4A1E; padding: 10px 14px 12px; }
+.hero-sm { font-size: 10px; color: #7fb86a; letter-spacing: 0.06em; text-transform: uppercase; }
+.hero-row { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 0; }
+.hero-title { font-size: 15px; font-weight: 500; color: #e8f0e1; }
+.select-all-btn { font-size: 10px; color: #7fb86a; background: rgba(255,255,255,0.08); border: 0.5px solid rgba(255,255,255,0.15); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.select-all-btn.active { background: rgba(127,184,106,0.25); border-color: #7fb86a; color: #c8ddb8; }
+
+.section-hd { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px 4px; }
+.section-hd .title { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
+.section-hd .count { font-size: 10px; color: var(--color-text-secondary); }
+
+.water-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); cursor: pointer; transition: background 0.1s; }
+.water-item:last-child { border-bottom: none; }
+.water-item.selected { background: #EAF3DE; }
+.water-item.done .wi-name { text-decoration: line-through; color: var(--color-text-secondary); }
+.water-item.done .wi-sub { color: var(--color-text-tertiary); }
+
+.check-circle { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--color-border-secondary); background: var(--color-background-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+.check-circle.sel { background: #3B6D11; border-color: #3B6D11; }
+.check-circle.done-c { background: #97C459; border-color: #97C459; }
+.check-circle svg { width: 12px; height: 12px; }
+
+.wi-body { flex: 1; min-width: 0; }
+.wi-name { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
+.wi-sub { font-size: 10px; color: var(--color-text-secondary); margin-top: 1px; }
+.wi-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+.badge-overdue { background: #FCEBEB; color: #A32D2D; }
+.badge-today { background: #EAF3DE; color: #27500A; }
+.badge-done { background: #C0DD97; color: #27500A; }
+
+.bulk-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: #EAF3DE; border-bottom: 0.5px solid #C0DD97; }
+.bulk-text { font-size: 11px; color: #27500A; font-weight: 500; }
+.bulk-btn { background: #2D4A1E; color: #c8ddb8; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-family: var(--font-sans); cursor: pointer; }
+
+.confirm-sheet { background: var(--color-background-primary); border-top: 0.5px solid var(--color-border-tertiary); padding: 10px 14px 14px; }
+.confirm-handle { width: 32px; height: 3px; background: var(--color-border-secondary); border-radius: 2px; margin: 0 auto 10px; }
+.confirm-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 8px; }
+.confirm-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.confirm-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: var(--color-background-secondary); border-radius: 6px; }
+.confirm-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.confirm-name { font-size: 11px; color: var(--color-text-primary); flex: 1; }
+.confirm-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #EAF3DE; color: #27500A; }
+.confirm-btn { width: 100%; background: #2D4A1E; color: #c8ddb8; border: none; border-radius: 8px; padding: 11px; font-size: 12px; font-weight: 500; font-family: var(--font-sans); cursor: pointer; }
+</style>
+
+<h2 class="sr-only">Watering screen with multi-select: tap plants to select multiple, then bulk mark as watered. Two states shown: selection mode and confirmation sheet.</h2>
+
+<div class="wrap">
+
+  <div>
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span>●●●</span></div>
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-sm">Today · Wed 23 Apr</div>
+          <div class="hero-row">
+            <div class="hero-title">Watering</div>
+            <div class="select-all-btn active" id="sel-all-1" onclick="toggleSelectAll(1)">Select all</div>
+          </div>
+        </div>
+
+        <div class="bulk-bar" id="bulk-bar-1">
+          <span class="bulk-text" id="bulk-text-1">2 selected</span>
+          <button class="bulk-btn" onclick="confirmSelected(1)">Mark watered</button>
+        </div>
+
+        <div class="section-hd">
+          <span class="title">To water today</span>
+          <span class="count">tap to select</span>
+        </div>
+
+        <div class="water-item selected" id="item-a" onclick="toggleItem('item-a',1)">
+          <div class="check-circle sel" id="chk-a"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="wi-body">
+            <div class="wi-name">Victoria Plum</div>
+            <div class="wi-sub">3 days overdue · Every 10d</div>
+          </div>
+          <span class="wi-badge badge-overdue">Overdue</span>
+        </div>
+
+        <div class="water-item selected" id="item-b" onclick="toggleItem('item-b',1)">
+          <div class="check-circle sel" id="chk-b"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="wi-body">
+            <div class="wi-name">Cherry Tomato</div>
+            <div class="wi-sub">Due today · Every 2d</div>
+          </div>
+          <span class="wi-badge badge-today">Due</span>
+        </div>
+
+        <div class="water-item" id="item-c" onclick="toggleItem('item-c',1)">
+          <div class="check-circle" id="chk-c"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="transparent" stroke-width="1.3"/></svg></div>
+          <div class="wi-body">
+            <div class="wi-name">Basil (pot)</div>
+            <div class="wi-sub">Due today · Pots dry faster</div>
+          </div>
+          <span class="wi-badge badge-today">Due</span>
+        </div>
+
+        <div class="water-item done" id="item-d" onclick="">
+          <div class="check-circle done-c" id="chk-d"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="wi-body">
+            <div class="wi-name">Courgette</div>
+            <div class="wi-sub">Watered · just now</div>
+          </div>
+          <span class="wi-badge badge-done">Done</span>
+        </div>
+
+      </div>
+      <div class="nav">
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4v4h4V7z" stroke="currentColor" stroke-width="1.2"/></svg><span>Home</span></div>
+        <div class="ni active"><svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="#3B6D11" stroke-width="1.2" rx="2"/><path d="M3 7h10M7 3v10" stroke="#3B6D11" stroke-width="1.2"/></svg><span>Water</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.2"/></svg><span>Plants</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg><span>Profile</span></div>
+      </div>
+    </div>
+    <div class="lbl">Select mode</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span>●●●</span></div>
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-sm">Today · Wed 23 Apr</div>
+          <div class="hero-row">
+            <div class="hero-title">Watering</div>
+            <div class="select-all-btn">Select all</div>
+          </div>
+        </div>
+
+        <div class="section-hd">
+          <span class="title">To water today</span>
+          <span class="count">3 remaining</span>
+        </div>
+
+        <div class="water-item" style="opacity:0.5;">
+          <div class="check-circle"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="transparent" stroke-width="1.3"/></svg></div>
+          <div class="wi-body"><div class="wi-name">Victoria Plum</div><div class="wi-sub">3 days overdue</div></div>
+          <span class="wi-badge badge-overdue">Overdue</span>
+        </div>
+        <div class="water-item" style="opacity:0.5;">
+          <div class="check-circle"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="transparent" stroke-width="1.3"/></svg></div>
+          <div class="wi-body"><div class="wi-name">Cherry Tomato</div><div class="wi-sub">Due today</div></div>
+          <span class="wi-badge badge-today">Due</span>
+        </div>
+        <div class="water-item" style="opacity:0.5;">
+          <div class="check-circle"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="transparent" stroke-width="1.3"/></svg></div>
+          <div class="wi-body"><div class="wi-name">Basil (pot)</div><div class="wi-sub">Due today</div></div>
+          <span class="wi-badge badge-today">Due</span>
+        </div>
+
+        <div class="confirm-sheet">
+          <div class="confirm-handle"></div>
+          <div class="confirm-title">Mark 2 plants as watered?</div>
+          <div class="confirm-list">
+            <div class="confirm-row">
+              <div class="confirm-dot" style="background:#2D4A1E;"></div>
+              <span class="confirm-name">Victoria Plum</span>
+              <span class="confirm-badge">Was overdue</span>
+            </div>
+            <div class="confirm-row">
+              <div class="confirm-dot" style="background:#639922;"></div>
+              <span class="confirm-name">Cherry Tomato</span>
+              <span class="confirm-badge">Due today</span>
+            </div>
+          </div>
+          <button class="confirm-btn">Confirm — watered both</button>
+        </div>
+
+      </div>
+      <div class="nav">
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L2 7v7h4v-4h4V7z" stroke="currentColor" stroke-width="1.2"/></svg><span>Home</span></div>
+        <div class="ni active"><svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="#3B6D11" stroke-width="1.2" rx="2"/><path d="M3 7h10M7 3v10" stroke="#3B6D11" stroke-width="1.2"/></svg><span>Water</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.2"/></svg><span>Plants</span></div>
+        <div class="ni"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.2"/></svg><span>Profile</span></div>
+      </div>
+    </div>
+    <div class="lbl">Confirm sheet</div>
+  </div>
+
+</div>
+
+<script>
+const state1 = { 'item-a': true, 'item-b': true, 'item-c': false };
+
+function updateBulkBar(screen) {
+  const count = Object.values(state1).filter(Boolean).length;
+  const bar = document.getElementById('bulk-bar-1');
+  const txt = document.getElementById('bulk-text-1');
+  if (count > 0) {
+    bar.style.display = 'flex';
+    txt.textContent = count + ' selected';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function toggleItem(id, screen) {
+  if (document.getElementById(id).classList.contains('done')) return;
+  state1[id] = !state1[id];
+  const item = document.getElementById(id);
+  const chk = document.getElementById('chk-' + id.split('-')[1]);
+  if (state1[id]) {
+    item.classList.add('selected');
+    chk.classList.add('sel');
+    chk.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  } else {
+    item.classList.remove('selected');
+    chk.classList.remove('sel');
+    chk.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="transparent" stroke-width="1.3"/></svg>';
+  }
+  updateBulkBar(screen);
+}
+
+function toggleSelectAll(screen) {
+  const allSelected = Object.values(state1).every(Boolean);
+  ['item-a','item-b','item-c'].forEach(id => {
+    state1[id] = !allSelected;
+    const item = document.getElementById(id);
+    const letter = id.split('-')[1];
+    const chk = document.getElementById('chk-' + letter);
+    if (!allSelected) {
+      item.classList.add('selected');
+      chk.classList.add('sel');
+      chk.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    } else {
+      item.classList.remove('selected');
+      chk.classList.remove('sel');
+      chk.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="transparent" stroke-width="1.3"/></svg>';
+    }
+  });
+  updateBulkBar(screen);
+}
+
+function confirmSelected(screen) {
+  ['item-a','item-b','item-c'].forEach(id => {
+    if (state1[id]) {
+      const item = document.getElementById(id);
+      const letter = id.split('-')[1];
+      const chk = document.getElementById('chk-' + letter);
+      item.classList.remove('selected');
+      item.classList.add('done');
+      chk.classList.remove('sel');
+      chk.classList.add('done-c');
+      chk.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      item.querySelector('.wi-sub').textContent = 'Watered · just now';
+      const badge = item.querySelector('.wi-badge');
+      badge.textContent = 'Done';
+      badge.className = 'wi-badge badge-done';
+      state1[id] = false;
+    }
+  });
+  document.getElementById('bulk-bar-1').style.display = 'none';
+}
+
+updateBulkBar(1);
+</script>
