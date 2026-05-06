@@ -5,6 +5,7 @@ import '../repositories/care_instruction_repository.dart';
 import '../repositories/photo_repository.dart';
 import '../repositories/dashboard_repository.dart';
 import '../repositories/plant_repository.dart';
+import '../repositories/user_repository.dart';
 
 /// An [InheritedWidget] that holds all repository instances and makes them
 /// available to descendant widgets via [RepositoryProvider.of<T>(context)].
@@ -17,6 +18,7 @@ class RepositoryProvider extends InheritedWidget {
   final CareInstructionRepository careInstructionRepository;
   final PhotoRepository photoRepository;
   final DashboardRepository dashboardRepository;
+  final UserRepository userRepository;
 
   const RepositoryProvider({
     super.key,
@@ -25,6 +27,7 @@ class RepositoryProvider extends InheritedWidget {
     required this.careInstructionRepository,
     required this.photoRepository,
     required this.dashboardRepository,
+    required this.userRepository,
     required super.child,
   });
 
@@ -47,6 +50,7 @@ class RepositoryProvider extends InheritedWidget {
     }
     if (T == PhotoRepository) return provider!.photoRepository as T;
     if (T == DashboardRepository) return provider!.dashboardRepository as T;
+    if (T == UserRepository) return provider!.userRepository as T;
 
     throw ArgumentError('Unknown repository type: $T');
   }
@@ -57,5 +61,6 @@ class RepositoryProvider extends InheritedWidget {
       actionLogRepository != oldWidget.actionLogRepository ||
       careInstructionRepository != oldWidget.careInstructionRepository ||
       photoRepository != oldWidget.photoRepository ||
-      dashboardRepository != oldWidget.dashboardRepository;
+      dashboardRepository != oldWidget.dashboardRepository ||
+      userRepository != oldWidget.userRepository;
 }

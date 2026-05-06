@@ -5,6 +5,7 @@ import 'package:garden_app/data/mock/mock_care_instruction_repository.dart';
 import 'package:garden_app/data/mock/mock_dashboard_repository.dart';
 import 'package:garden_app/data/mock/mock_photo_repository.dart';
 import 'package:garden_app/data/mock/mock_plant_repository.dart';
+import 'package:garden_app/data/mock/mock_user_repository.dart';
 import 'package:garden_app/data/repository_provider.dart';
 import 'package:garden_app/screens/plant_detail/plant_detail_screen.dart';
 import 'package:garden_app/theme/app_colors.dart';
@@ -19,6 +20,7 @@ void main() {
       careInstructionRepository: MockCareInstructionRepository(),
       photoRepository: MockPhotoRepository(),
       dashboardRepository: MockDashboardRepository(),
+      userRepository: MockUserRepository(),
       child: MaterialApp(
         home: PlantDetailScreen(plantInstanceId: plantInstanceId),
       ),
