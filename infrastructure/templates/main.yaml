@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Main CloudFormation template for the Gardening Agent infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name (dev or prod)
+  
+  ProjectName:
+    Type: String
+    Default: gardening-agent
+    Description: Name of the project, used as a prefix for resource names
+
+Resources:
+  # IAM Roles and Policies
+  IAMStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./iam.yaml
+      Parameters:
+        Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
+
+  # DynamoDB Tables
+  DynamoDBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./dynamodb.yaml
+      Parameters:
+        Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
+
+  # Lambda Function and Layer
+  LambdaStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./lambda.yaml
+      Parameters:
+        Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
+        LambdaExecutionRoleArn: !GetAtt IAMStack.Outputs.LambdaExecutionRoleArn
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt LambdaStack.Outputs.LambdaFunctionArn
+  
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !GetAtt LambdaStack.Outputs.LambdaFunctionName
+  
+  UserTableName:
+    Description: Name of the user data DynamoDB table
+    Value: !GetAtt DynamoDBStack.Outputs.UserTableName
+  
+  PlantTableName:
+    Description: Name of the plant data DynamoDB table
+    Value: !GetAtt DynamoDBStack.Outputs.PlantTableName
