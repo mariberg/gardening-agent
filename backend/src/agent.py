@@ -1,16 +1,21 @@
 import boto3
+import logging
 import os
 import json
 import uuid
 from datetime import datetime, timezone
+from boto3.dynamodb.conditions import Attr
 from strands import Agent, tool
 from strands_tools import http_request
 from typing import Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 # Get configuration from environment variables (set by CloudFormation)
 BEDROCK_REGION = os.environ.get('BEDROCK_REGION', 'eu-west-2')
 USER_DATA_TABLE_NAME = os.environ.get('USER_DATA_TABLE_NAME', 'plant_database_users')
 PLANT_DEFINITIONS_TABLE_NAME = os.environ.get('PLANT_DEFINITIONS_TABLE_NAME', 'garden_plants')
+USER_PROFILES_TABLE_NAME = os.environ.get('USER_PROFILES_TABLE_NAME', 'UserProfiles')
 
 # Initialize DynamoDB resource with region from environment
 dynamodb = boto3.resource('dynamodb', region_name=BEDROCK_REGION)
@@ -18,6 +23,91 @@ dynamodb = boto3.resource('dynamodb', region_name=BEDROCK_REGION)
 # Initialize table references
 user_data_table = dynamodb.Table(USER_DATA_TABLE_NAME)
 plant_definitions_table = dynamodb.Table(PLANT_DEFINITIONS_TABLE_NAME)
+user_profiles_table = dynamodb.Table(USER_PROFILES_TABLE_NAME)
+
+
+class AuthError(Exception):
+    """Raised when authentication/authorization fails."""
+    def __init__(self, status_code: int, error_code: str, message: str):
+        self.status_code = status_code
+        self.error_code = error_code
+        self.message = message
+        super().__init__(message)
+
+
+def extract_user_identity(event: dict) -> tuple[str, str | None]:
+    """
+    Extract sub claim (and optionally email) from the API Gateway authorizer context.
+
+    Returns:
+        (sub, email) — email may be None if not present.
+
+    Raises:
+        AuthError(401) if sub is absent, empty, or whitespace-only.
+        AuthError(401) if the authorizer claims structure is missing or malformed.
+    """
+    try:
+        claims = event["requestContext"]["authorizer"]["claims"]
+    except (KeyError, TypeError):
+        raise AuthError(401, "missing_claims", "Authorizer claims are absent or malformed.")
+
+    sub = claims.get("sub")
+    if not sub or not sub.strip():
+        raise AuthError(401, "invalid_sub", "Token sub claim is missing or empty.")
+
+    email = claims.get("email") or None
+    return sub.strip(), email
+
+
+def resolve_garden_id(sub: str, user_profiles_table) -> tuple[str, str]:
+    """
+    Resolve a Cognito sub UUID to a (legacy_user_id, garden_id) pair.
+
+    Resolution order:
+      1. Scan UserProfiles for item where cognito_sub = sub  (User_Identity_Mapping)
+      2. If found: use that item's user_id (legacy key) and garden_id
+      3. If not found: raise AuthError(403)
+
+    Returns:
+        (legacy_user_id, garden_id)
+
+    Raises:
+        AuthError(403) if no UserProfiles record matches the sub.
+        AuthError(403) if matched record has no garden_id.
+        AuthError(500) if DynamoDB call fails.
+    """
+    try:
+        response = user_profiles_table.scan(
+            FilterExpression=Attr("cognito_sub").eq(sub),
+            Limit=1,
+        )
+    except Exception as e:
+        logger.error("Garden membership lookup failed for sub=%s: %s", sub, str(e))
+        raise AuthError(500, "membership_lookup_failed",
+                        "Garden membership could not be resolved.")
+
+    items = response.get("Items", [])
+    if not items:
+        raise AuthError(403, "no_garden_association",
+                        "No garden is associated with this account.")
+
+    profile = items[0]
+    garden_id = profile.get("garden_id")
+    if not garden_id:
+        raise AuthError(403, "no_garden_association",
+                        "No garden is associated with this account.")
+
+    legacy_user_id = profile["user_id"]
+    return legacy_user_id, garden_id
+
+
+def _safe_sub(event: dict) -> str:
+    """Extract sub for logging without raising on malformed events."""
+    try:
+        return event["requestContext"]["authorizer"]["claims"].get("sub", "unknown")
+    except Exception:
+        return "unknown"
+
 
 @tool
 def dynamodb_lookup_user_data(user_id: str) -> Dict[str, Any]:
@@ -211,6 +301,7 @@ def create_api_gateway_response(
     status_code: int, 
     body: Dict[str, Any] = None, 
     error_message: str = None,
+    error_code: str = None,
     user_id: str = None,
     weather_conditions: Dict[str, Any] = None,
     request_id: str = None
@@ -225,7 +316,7 @@ def create_api_gateway_response(
         # Error response format
         response_body = {
             "statusCode": status_code,
-            "error": get_error_type_from_status(status_code),
+            "error": error_code or get_error_type_from_status(status_code),
             "message": error_message,
             "request_id": request_id or str(uuid.uuid4()),
             "timestamp": timestamp
@@ -425,48 +516,40 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
         if is_api_gateway_event(event):
             print(f"Processing API Gateway event - Request ID: {request_id}")
             
-            # Handle OPTIONS request for CORS preflight
+            # Handle OPTIONS request for CORS preflight — no auth check
             if event.get('httpMethod') == 'OPTIONS':
                 return create_api_gateway_response(200, {}, request_id=request_id)
             
-            # Parse API Gateway request
+            # Extract identity from validated JWT claims
             try:
-                parsed_request = parse_api_gateway_request(event)
-                request_data = parsed_request['request_data']
-                
-                # Extract user_id from request data
-                user_id = request_data.get('user_id')
-                
-                # Validate user_id using enhanced validation
-                is_valid, validation_error = validate_user_id(user_id)
-                if not is_valid:
-                    return create_api_gateway_response(
-                        400, 
-                        error_message=validation_error,
-                        user_id=user_id if isinstance(user_id, str) else None,
-                        request_id=request_id
-                    )
-                
-                # Clean the user_id (strip whitespace)
-                user_id = user_id.strip()
-                
-                # Construct prompt from user_id - this will trigger the dynamodb_lookup_user_data tool
-                user_prompt = f"Give me plant advice for user_id {user_id}"
-                
-            except ValueError as e:
+                sub, email = extract_user_identity(event)
+                log_prefix = f"[sub={sub} email={email or 'none'}]"
+                logger.info("%s Request received", log_prefix)
+            except AuthError as e:
+                logger.warning("Auth failure: %s sub=%s", e.error_code, _safe_sub(event))
                 return create_api_gateway_response(
-                    400, 
-                    error_message=f"Invalid request format: {str(e)}",
-                    user_id=user_id,
-                    request_id=request_id
+                    e.status_code,
+                    error_message=e.message,
+                    error_code=e.error_code,
+                    request_id=request_id,
                 )
-            except Exception as e:
+            
+            # Resolve garden via UserProfiles mapping
+            try:
+                legacy_user_id, garden_id = resolve_garden_id(sub, user_profiles_table)
+                logger.info("%s Resolved garden_id=%s user_id=%s", log_prefix, garden_id, legacy_user_id)
+            except AuthError as e:
+                logger.warning("%s Garden resolution failed: %s", log_prefix, e.error_code)
                 return create_api_gateway_response(
-                    500, 
-                    error_message=f"Failed to parse request: {str(e)}",
-                    user_id=user_id,
-                    request_id=request_id
+                    e.status_code,
+                    error_message=e.message,
+                    error_code=e.error_code,
+                    request_id=request_id,
                 )
+            
+            # Ignore any user_id from request body — use legacy_user_id from mapping
+            user_id = legacy_user_id
+            user_prompt = f"Give me plant advice for user_id {user_id}"
         
         else:
             print(f"Processing direct Lambda invocation - Request ID: {request_id}")

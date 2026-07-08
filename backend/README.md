@@ -205,3 +205,198 @@ The following components are currently under development and not yet fully teste
 - `frontend/` - Web-based user interface (vanilla HTML/CSS/JavaScript)
 - `scripts/` - Deployment and utility scripts  
 - `tests/` - Test suite for validation and integration testing
+
+
+---
+
+## Authentication
+
+The `POST /advice` endpoint is protected by an Amazon Cognito JWT authorizer. Every request must include a valid Access Token in the `Authorization` header. Unauthenticated requests receive a `401` response before the Lambda function is ever invoked. `OPTIONS` preflight requests remain public.
+
+Get the User Pool ID and Client ID from the CloudFormation stack outputs:
+
+| Output key | Used for |
+|---|---|
+| `CognitoUserPoolId` | `UserPoolId` in the SDK config |
+| `CognitoUserPoolClientId` | `ClientId` in the SDK config |
+
+---
+
+### Sign-In Flow
+
+Use the `amazon-cognito-identity-js` SDK (or AWS Amplify Auth). The `USER_SRP_AUTH` flow is preferred because the password is never sent in plaintext; `USER_PASSWORD_AUTH` is acceptable for local testing.
+
+```javascript
+import { CognitoUserPool, CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js';
+
+const poolData = {
+  UserPoolId: process.env.REACT_APP_USER_POOL_ID,        // from CloudFormation output CognitoUserPoolId
+  ClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID,   // from CloudFormation output CognitoUserPoolClientId
+};
+const userPool = new CognitoUserPool(poolData);
+
+function signIn(email, password) {
+  const user = new CognitoUser({ Username: email, Pool: userPool });
+  const authDetails = new AuthenticationDetails({ Username: email, Password: password });
+
+  return new Promise((resolve, reject) => {
+    user.authenticateUser(authDetails, {
+      onSuccess(session) {
+        // Store tokens in memory (avoid localStorage for security)
+        const accessToken = session.getAccessToken().getJwtToken();
+        const idToken = session.getIdToken().getJwtToken();
+        const refreshToken = session.getRefreshToken().getToken();
+        tokenStore.set({
+          accessToken,
+          idToken,
+          refreshToken,
+          expiresAt: session.getAccessToken().getExpiration(),
+        });
+        resolve(session);
+      },
+      onFailure(err) {
+        // Display error to user — do NOT store tokens
+        reject(err);
+      },
+      newPasswordRequired(userAttributes) {
+        // FORCE_CHANGE_PASSWORD — see section below
+        user.completeNewPasswordChallenge(newPassword, {}, this);
+      },
+    });
+  });
+}
+```
+
+---
+
+### Calling the API
+
+Send the **Access Token** (not the ID Token) in the `Authorization` header. Refresh it proactively when it is within 60 seconds of expiry, and retry once on a `401` in case the token expired between the proactive check and the actual call.
+
+```javascript
+async function callAdviceEndpoint(body) {
+  let { accessToken, expiresAt } = tokenStore.get();
+
+  // Proactive refresh: renew if token expires within 60 seconds
+  if (Date.now() / 1000 > expiresAt - 60) {
+    accessToken = await refreshTokens();
+  }
+
+  const response = await fetch('/advice', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': accessToken,   // Access Token only — not the ID Token
+    },
+    body: JSON.stringify(body),
+  });
+
+  // Retry-once on 401 (token may have expired between the proactive check and this call)
+  if (response.status === 401) {
+    try {
+      accessToken = await refreshTokens();
+    } catch {
+      signOut();   // Refresh token expired — force re-login
+      throw new Error('Session expired. Please sign in again.');
+    }
+    return fetch('/advice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': accessToken },
+      body: JSON.stringify(body),
+    });
+  }
+
+  return response;
+}
+
+async function refreshTokens() {
+  const { refreshToken } = tokenStore.get();
+  // Use the Cognito SDK RefreshToken flow; throws if the refresh token is expired or invalid
+  const newSession = await cognitoUser.refreshSession(refreshToken);
+  const newAccessToken = newSession.getAccessToken().getJwtToken();
+  tokenStore.update({
+    accessToken: newAccessToken,
+    expiresAt: newSession.getAccessToken().getExpiration(),
+  });
+  return newAccessToken;
+}
+```
+
+---
+
+### FORCE_CHANGE_PASSWORD Handling
+
+When a user is created manually in the AWS Console their account starts in the `FORCE_CHANGE_PASSWORD` state. Their first sign-in triggers the `newPasswordRequired` callback instead of `onSuccess`. The frontend must:
+
+1. Show a "Set your permanent password" dialog.
+2. Collect a new password that satisfies the pool policy (≥8 characters, uppercase, lowercase, number, symbol).
+3. Call `user.completeNewPasswordChallenge(newPassword, {}, callbacks)`.
+4. If Cognito rejects the password (policy violation), show the error and let the user try again — the account stays in `FORCE_CHANGE_PASSWORD`.
+5. Once the challenge succeeds, Cognito issues `AccessToken`, `IdToken`, and `RefreshToken` and the normal sign-in flow resumes.
+
+Do not store tokens or consider the user authenticated until `completeNewPasswordChallenge` succeeds.
+
+---
+
+### Manual User Creation (AWS Console)
+
+These steps let an administrator onboard users before self-service sign-up is available.
+
+#### Step 1 — Open the User Pool
+
+1. Sign into the AWS Console.
+2. Navigate to **Cognito → User Pools**.
+3. Click the user pool named `gardening-agent-user-pool-<env>`.
+
+#### Step 2 — Create the User
+
+1. Select the **Users** tab → **Create user**.
+2. **Invitation message**: choose *Send an email invitation* if SES is configured (optional).
+3. **Username**: enter the user's email address (the pool uses email as the username).
+4. **Temporary password**: enter a password that meets the pool policy (≥8 chars, upper, lower, number, symbol). The user is forced to change it on first login.
+5. **Email address**: confirm the address and tick **Mark email address as verified** so the user does not need a separate verification step.
+6. Click **Create user**. The user appears with status `FORCE_CHANGE_PASSWORD`.
+
+#### Step 3 — Note the Cognito `sub` UUID
+
+On the user's detail page, find **Attributes → sub**. Copy this UUID — you need it for the DynamoDB record in Step 4.
+
+#### Step 4 — Create the UserProfiles Record
+
+Create a record in the `UserProfiles-<env>` DynamoDB table that links the Cognito `sub` to a garden. You can do this via the DynamoDB Console (**Explore items → Create item**) or with the AWS CLI:
+
+```bash
+aws dynamodb put-item \
+  --table-name UserProfiles-dev \
+  --item '{
+    "user_id":     {"S": "alice"},
+    "cognito_sub": {"S": "<sub-uuid>"},
+    "garden_id":   {"S": "garden_001"},
+    "display_name":{"S": "Alice"},
+    "email":       {"S": "alice@example.com"},
+    "latitude":    {"S": "51.5074"},
+    "longitude":   {"S": "-0.1278"},
+    "created_at":  {"S": "2026-01-15T10:00:00Z"}
+  }'
+```
+
+The JSON record shape:
+
+```json
+{
+  "user_id": "alice",
+  "cognito_sub": "<sub-uuid>",
+  "garden_id": "garden_001",
+  "display_name": "Alice",
+  "email": "alice@example.com",
+  "latitude": "51.5074",
+  "longitude": "-0.1278",
+  "created_at": "2026-01-15T10:00:00Z"
+}
+```
+
+`user_id` can be any human-readable key or the `sub` UUID itself. `cognito_sub` must match the value from Step 3 exactly.
+
+#### Step 5 — Verify Access
+
+Have the user sign in with their email and temporary password. After they set a permanent password through the `FORCE_CHANGE_PASSWORD` dialog, call `POST /advice` with the resulting `AccessToken`. The Lambda resolves the `UserProfiles` record via `cognito_sub`, finds `garden_id`, and returns advice for that garden.

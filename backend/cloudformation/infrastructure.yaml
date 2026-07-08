@@ -31,6 +31,30 @@ Parameters:
     Default: eu-west-2
     Description: AWS region for Bedrock model access
 
+  GardenDataTableName:
+    Type: String
+    Default: GardenData
+    Description: Name for the GardenData DynamoDB table (single-table design)
+
+  UserProfilesTableName:
+    Type: String
+    Default: UserProfiles
+    Description: Name for the UserProfiles DynamoDB table
+
+  WateringScheduleTableName:
+    Type: String
+    Default: WateringSchedule
+    Description: Name for the WateringSchedule DynamoDB table
+
+  CareInstructionsTableName:
+    Type: String
+    Default: CareInstructions
+    Description: Name for the CareInstructions DynamoDB table
+
+  LambdaLayerArn:
+    Type: String
+    Description: ARN of the existing Lambda layer containing shared Python dependencies
+
   CodeS3Bucket:
     Type: String
     Default: ""
@@ -42,6 +66,90 @@ Parameters:
     Description: S3 key for Lambda deployment package (optional)
 
 Resources:
+  # Cognito User Pool
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${LambdaFunctionName}-user-pool-${Environment}'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      UserPoolTags:
+        Environment: !Ref Environment
+        Application: gardening-agent
+
+  # Cognito User Pool Client
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${LambdaFunctionName}-client-${Environment}'
+      UserPoolId: !Ref CognitoUserPool
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        RefreshToken: days
+
+  # Cognito API Authorizer
+  CognitoApiAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: !Sub '${LambdaFunctionName}-cognito-authorizer-${Environment}'
+      RestApiId: !Ref GardeningAgentApi
+      Type: COGNITO_USER_POOLS
+      IdentitySource: method.request.header.Authorization
+      ProviderARNs:
+        - !GetAtt CognitoUserPool.Arn
+      AuthorizerResultTtlInSeconds: 300
+
+  # Gateway Response for 401 Unauthorized (adds CORS headers before Lambda runs)
+  GatewayResponseUnauthorized:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResponseType: UNAUTHORIZED
+      StatusCode: '401'
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+      ResponseTemplates:
+        application/json: |
+          {
+            "error": "unauthorized",
+            "message": "$context.authorizer.claims",
+            "code": "$context.error.responseType"
+          }
+
+  # Gateway Response for 403 Access Denied (adds CORS headers before Lambda runs)
+  GatewayResponseAccessDenied:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResponseType: ACCESS_DENIED
+      StatusCode: '403'
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+      ResponseTemplates:
+        application/json: |
+          {
+            "error": "access_denied",
+            "message": "$context.error.message",
+            "code": "$context.error.responseType"
+          }
+
   # IAM Role for Lambda Function
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -68,10 +176,34 @@ Resources:
                   - dynamodb:UpdateItem
                   - dynamodb:DeleteItem
                   - dynamodb:Query
-                  - dynamodb:Scan
+                  - dynamodb:BatchWriteItem
                 Resource:
                   - !GetAtt UserDataTable.Arn
                   - !GetAtt PlantDefinitionsTable.Arn
+                  - !GetAtt GardenDataTable.Arn
+                  - !GetAtt UserProfilesTable.Arn
+                  - !GetAtt WateringScheduleTable.Arn
+                  - !GetAtt CareInstructionsTable.Arn
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub '${PhotoStorageBucket.Arn}/*'
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub '${PhotoStorageBucket.Arn}/photos/*'
+        - PolicyName: SelfInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt GardeningApiHandlerFunction.Arn
         - PolicyName: BedrockAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -118,6 +250,130 @@ Resources:
         - Key: Application
           Value: gardening-agent
 
+  # GardenData DynamoDB Table (Single Table Design)
+  GardenDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${GardenDataTableName}-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: garden_id
+          AttributeType: S
+        - AttributeName: sort_key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: garden_id
+          KeyType: HASH
+        - AttributeName: sort_key
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # UserProfiles DynamoDB Table
+  UserProfilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${UserProfilesTableName}-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # WateringSchedule DynamoDB Table with TTL
+  WateringScheduleTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${WateringScheduleTableName}-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: garden_id
+          AttributeType: S
+        - AttributeName: scheduled_date_instance_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: garden_id
+          KeyType: HASH
+        - AttributeName: scheduled_date_instance_id
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # CareInstructions DynamoDB Table
+  CareInstructionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${CareInstructionsTableName}-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: species_id
+          AttributeType: S
+        - AttributeName: instruction_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: species_id
+          KeyType: HASH
+        - AttributeName: instruction_id
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # S3 Photo Storage Bucket
+  PhotoStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'gardening-photos-${Environment}-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 90
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+            AllowedOrigins:
+              - '*'
+            MaxAge: 3600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
   # Lambda Function
   GardeningAgentFunction:
     Type: AWS::Lambda::Function
@@ -143,6 +399,48 @@ Resources:
           Value: !Ref Environment
         - Key: Application
           Value: gardening-agent
+
+  # API Handler Lambda Function (routes all /api/v1/* requests)
+  GardeningApiHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'gardening-api-handler-${Environment}'
+      Runtime: python3.13
+      Handler: src/api/router.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Layers:
+        - !Ref LambdaLayerArn
+      Code:
+        ZipFile: |
+          # Placeholder code - actual deployment will use packaged source
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "Function created successfully"}
+      Environment:
+        Variables:
+          GARDEN_DATA_TABLE_NAME: !Ref GardenDataTable
+          USER_PROFILES_TABLE_NAME: !Ref UserProfilesTable
+          WATERING_SCHEDULE_TABLE_NAME: !Ref WateringScheduleTable
+          CARE_INSTRUCTIONS_TABLE_NAME: !Ref CareInstructionsTable
+          SPECIES_TABLE_NAME: !Ref PlantDefinitionsTable
+          PHOTO_BUCKET_NAME: !Ref PhotoStorageBucket
+          LAMBDA_FUNCTION_NAME: !Sub 'gardening-api-handler-${Environment}'
+          BEDROCK_REGION: !Ref BedrockRegion
+      Timeout: 30
+      MemorySize: 256
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: gardening-agent
+
+  # Lambda Permission for API Gateway to invoke the API handler function
+  ApiHandlerLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GardeningApiHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${GardeningAgentApi}/*/*'
 
   # API Gateway REST API
   GardeningAgentApi:
@@ -174,7 +472,8 @@ Resources:
       RestApiId: !Ref GardeningAgentApi
       ResourceId: !Ref AdviceResource
       HttpMethod: POST
-      AuthorizationType: NONE
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
@@ -208,6 +507,960 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
+  # /api resource
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !GetAtt GardeningAgentApi.RootResourceId
+      PathPart: api
+
+  # /api/v1 resource
+  ApiV1Resource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiResource
+      PathPart: v1
+
+  # /api/v1/plants resource
+  PlantsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: plants
+
+  PlantsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  PlantsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/plants/{instance_id} resource
+  PlantInstanceResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref PlantsResource
+      PathPart: '{instance_id}'
+
+  PlantInstanceGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantInstanceResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  PlantInstanceOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantInstanceResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/plants/{instance_id}/action-logs resource
+  PlantActionLogsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref PlantInstanceResource
+      PathPart: action-logs
+
+  PlantActionLogsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantActionLogsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  PlantActionLogsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantActionLogsResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  PlantActionLogsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantActionLogsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/plants/{instance_id}/photos resource
+  PlantPhotosResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref PlantInstanceResource
+      PathPart: photos
+
+  PlantPhotosGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantPhotosResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  PlantPhotosOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantPhotosResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/plants/{instance_id}/care-instructions resource
+  PlantCareInstructionsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref PlantInstanceResource
+      PathPart: care-instructions
+
+  PlantCareInstructionsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantCareInstructionsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  PlantCareInstructionsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PlantCareInstructionsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/action-logs resource
+  ActionLogsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: action-logs
+
+  ActionLogsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref ActionLogsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  ActionLogsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref ActionLogsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/action-logs/{action_id} resource
+  ActionLogInstanceResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ActionLogsResource
+      PathPart: '{action_id}'
+
+  ActionLogInstancePatchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref ActionLogInstanceResource
+      HttpMethod: PATCH
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  ActionLogInstanceOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref ActionLogInstanceResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/action-logs/{action_id}/chat resource
+  ActionLogChatResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ActionLogInstanceResource
+      PathPart: chat
+
+  ActionLogChatPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref ActionLogChatResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  ActionLogChatOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref ActionLogChatResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/watering resource (container)
+  WateringResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: watering
+
+  # /api/v1/watering/due resource
+  WateringDueResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref WateringResource
+      PathPart: due
+
+  WateringDueGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref WateringDueResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  WateringDueOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref WateringDueResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/watering/bulk-log resource
+  WateringBulkLogResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref WateringResource
+      PathPart: bulk-log
+
+  WateringBulkLogPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref WateringBulkLogResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  WateringBulkLogOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref WateringBulkLogResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/dashboard resource (container)
+  DashboardResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: dashboard
+
+  # /api/v1/dashboard/summary resource
+  DashboardSummaryResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref DashboardResource
+      PathPart: summary
+
+  DashboardSummaryGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref DashboardSummaryResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  DashboardSummaryOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref DashboardSummaryResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/users resource (container)
+  UsersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: users
+
+  # /api/v1/users/me resource
+  UsersMeResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref UsersResource
+      PathPart: me
+
+  UsersMeGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref UsersMeResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  UsersMePatchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref UsersMeResource
+      HttpMethod: PATCH
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  UsersMeOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref UsersMeResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/users/me/stats resource
+  UsersMeStatsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref UsersMeResource
+      PathPart: stats
+
+  UsersMeStatsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref UsersMeStatsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  UsersMeStatsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref UsersMeStatsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/uploads resource (container)
+  UploadsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: uploads
+
+  # /api/v1/uploads/presign resource
+  UploadsPresignResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref UploadsResource
+      PathPart: presign
+
+  UploadsPresignPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref UploadsPresignResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  UploadsPresignOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref UploadsPresignResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/photos resource (container)
+  PhotosResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: photos
+
+  # /api/v1/photos/{photo_id} resource
+  PhotoInstanceResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref PhotosResource
+      PathPart: '{photo_id}'
+
+  PhotoInstanceGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PhotoInstanceResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  PhotoInstanceOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref PhotoInstanceResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/care-instructions resource
+  CareInstructionsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: care-instructions
+
+  CareInstructionsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref CareInstructionsResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  CareInstructionsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref CareInstructionsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/agent resource (container)
+  AgentResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref ApiV1Resource
+      PathPart: agent
+
+  # /api/v1/agent/session-open resource
+  AgentSessionOpenResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref AgentResource
+      PathPart: session-open
+
+  AgentSessionOpenPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref AgentSessionOpenResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  AgentSessionOpenOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref AgentSessionOpenResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /api/v1/agent/analyse-photo resource
+  AgentAnalysePhotoResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ParentId: !Ref AgentResource
+      PathPart: analyse-photo
+
+  AgentAnalysePhotoPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref AgentAnalysePhotoResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GardeningApiHandlerFunction.Arn}/invocations'
+
+  AgentAnalysePhotoOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref GardeningAgentApi
+      ResourceId: !Ref AgentAnalysePhotoResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
   # Lambda Permission for API Gateway invocation
   LambdaApiGatewayPermission:
     Type: AWS::Lambda::Permission
@@ -223,6 +1476,47 @@ Resources:
     DependsOn:
       - AdvicePostMethod
       - AdviceOptionsMethod
+      - CognitoApiAuthorizer
+      - GatewayResponseUnauthorized
+      - GatewayResponseAccessDenied
+      - PlantsGetMethod
+      - PlantsOptionsMethod
+      - PlantInstanceGetMethod
+      - PlantInstanceOptionsMethod
+      - PlantActionLogsGetMethod
+      - PlantActionLogsPostMethod
+      - PlantActionLogsOptionsMethod
+      - PlantPhotosGetMethod
+      - PlantPhotosOptionsMethod
+      - PlantCareInstructionsGetMethod
+      - PlantCareInstructionsOptionsMethod
+      - ActionLogsGetMethod
+      - ActionLogsOptionsMethod
+      - ActionLogInstancePatchMethod
+      - ActionLogInstanceOptionsMethod
+      - ActionLogChatPostMethod
+      - ActionLogChatOptionsMethod
+      - WateringDueGetMethod
+      - WateringDueOptionsMethod
+      - WateringBulkLogPostMethod
+      - WateringBulkLogOptionsMethod
+      - DashboardSummaryGetMethod
+      - DashboardSummaryOptionsMethod
+      - UsersMeGetMethod
+      - UsersMePatchMethod
+      - UsersMeOptionsMethod
+      - UsersMeStatsGetMethod
+      - UsersMeStatsOptionsMethod
+      - UploadsPresignPostMethod
+      - UploadsPresignOptionsMethod
+      - PhotoInstanceGetMethod
+      - PhotoInstanceOptionsMethod
+      - CareInstructionsPostMethod
+      - CareInstructionsOptionsMethod
+      - AgentSessionOpenPostMethod
+      - AgentSessionOpenOptionsMethod
+      - AgentAnalysePhotoPostMethod
+      - AgentAnalysePhotoOptionsMethod
     Properties:
       RestApiId: !Ref GardeningAgentApi
       Description: !Sub 'Deployment for ${Environment} environment'
@@ -304,3 +1598,15 @@ Outputs:
     Value: !Ref ApiGatewayStage
     Export:
       Name: !Sub '${AWS::StackName}-ApiGatewayStageName'
+
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID for frontend configuration
+    Value: !Ref CognitoUserPool
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoUserPoolId'
+
+  CognitoUserPoolClientId:
+    Description: Cognito User Pool Client ID for frontend configuration
+    Value: !Ref CognitoUserPoolClient
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoUserPoolClientId'

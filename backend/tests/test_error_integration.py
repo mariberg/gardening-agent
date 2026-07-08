@@ -14,56 +14,76 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 
 def test_api_gateway_validation_errors():
-    """Test API Gateway validation errors without AWS dependencies."""
-    print("Testing API Gateway validation errors...")
-    
-    # Mock boto3 and other AWS dependencies
-    with patch('boto3.resource') as mock_boto3:
-        # Import after mocking
+    """
+    Test API Gateway auth enforcement without AWS dependencies.
+
+    After the Cognito authorizer was wired to the POST /advice endpoint, the
+    Lambda now derives identity exclusively from JWT claims injected by API
+    Gateway — the request body user_id is ignored on the API Gateway path.
+
+    Any API Gateway POST event that reaches the Lambda without valid Cognito
+    authorizer claims is rejected with 401 (missing/invalid claims) before any
+    body validation runs.
+    """
+    print("Testing API Gateway auth enforcement (Cognito claims required)...")
+
+    with patch('boto3.resource'):
         from agent import lambda_handler
-        
-        # Test missing user_id
-        event = {
+
+        # Event without Cognito authorizer claims → 401 (auth enforced before body validation)
+        event_no_claims = {
             'httpMethod': 'POST',
             'path': '/advice',
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({})
+            'body': json.dumps({}),
+            'queryStringParameters': None,
+            'requestContext': {},  # no authorizer claims
         }
-        
-        response = lambda_handler(event, None)
+        response = lambda_handler(event_no_claims, None)
         response_body = json.loads(response['body'])
-        
-        assert response['statusCode'] == 400, f"Expected 400, got {response['statusCode']}"
-        assert 'required' in response_body['message'].lower(), f"Expected 'required' in message: {response_body['message']}"
+
+        assert response['statusCode'] == 401, (
+            f"Expected 401 for request without Cognito claims, got {response['statusCode']}"
+        )
+        assert 'error' in response_body, "Expected 'error' field in 401 response body"
         assert 'request_id' in response_body, "Missing request_id in response"
-        print("✅ PASS: Missing user_id returns 400")
-        
-        # Test invalid user_id format
-        event['body'] = json.dumps({'user_id': 'user@invalid'})
-        response = lambda_handler(event, None)
+        print("✅ PASS: Request without Cognito claims returns 401")
+
+        # Event with empty sub → 401
+        event_empty_sub = {
+            'httpMethod': 'POST',
+            'path': '/advice',
+            'headers': {'Content-Type': 'application/json', 'Authorization': 'tok'},
+            'body': json.dumps({}),
+            'queryStringParameters': None,
+            'requestContext': {
+                'authorizer': {
+                    'claims': {'sub': '', 'email': 'user@example.com'},
+                },
+            },
+        }
+        response = lambda_handler(event_empty_sub, None)
         response_body = json.loads(response['body'])
-        
-        assert response['statusCode'] == 400, f"Expected 400, got {response['statusCode']}"
-        assert 'invalid characters' in response_body['message'].lower(), f"Expected 'invalid characters' in message: {response_body['message']}"
-        print("✅ PASS: Invalid user_id format returns 400")
-        
-        # Test empty user_id
-        event['body'] = json.dumps({'user_id': ''})
-        response = lambda_handler(event, None)
-        response_body = json.loads(response['body'])
-        
-        assert response['statusCode'] == 400, f"Expected 400, got {response['statusCode']}"
-        assert 'empty' in response_body['message'].lower(), f"Expected 'empty' in message: {response_body['message']}"
-        print("✅ PASS: Empty user_id returns 400")
-        
-        # Test non-string user_id
-        event['body'] = json.dumps({'user_id': 123})
-        response = lambda_handler(event, None)
-        response_body = json.loads(response['body'])
-        
-        assert response['statusCode'] == 400, f"Expected 400, got {response['statusCode']}"
-        assert 'string' in response_body['message'].lower(), f"Expected 'string' in message: {response_body['message']}"
-        print("✅ PASS: Non-string user_id returns 400")
+
+        assert response['statusCode'] == 401, (
+            f"Expected 401 for empty sub claim, got {response['statusCode']}"
+        )
+        print("✅ PASS: Empty sub claim returns 401")
+
+        # OPTIONS preflight still returns 200 (no auth check)
+        event_options = {
+            'httpMethod': 'OPTIONS',
+            'path': '/advice',
+            'headers': {'Origin': 'https://example.com'},
+            'body': None,
+            'queryStringParameters': None,
+            'requestContext': {},
+        }
+        response = lambda_handler(event_options, None)
+        assert response['statusCode'] == 200, (
+            f"Expected 200 for OPTIONS preflight, got {response['statusCode']}"
+        )
+        print("✅ PASS: OPTIONS preflight returns 200 (no auth check)")
 
 
 def test_direct_invocation_validation_errors():
@@ -166,9 +186,10 @@ def main():
     
     if passed == total:
         print("🎉 All integration tests passed!")
-        print("\n✅ Task 4 implementation verified:")
-        print("  - ✅ Missing user_id validation (400 Bad Request)")
-        print("  - ✅ Invalid user_id format validation (400 Bad Request)")
+        print("\n✅ Cognito auth enforcement verified:")
+        print("  - ✅ Missing Cognito claims returns 401 (auth enforced at Lambda entry)")
+        print("  - ✅ Empty sub claim returns 401")
+        print("  - ✅ OPTIONS preflight bypasses auth, returns 200")
         print("  - ✅ Enhanced error message formatting")
         print("  - ✅ Request ID tracking for debugging")
         print("  - ✅ CORS headers in all responses")
